@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Carpet AR Traffic</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚗 Carpet AR Traffic - Детская Игра</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
 <script type="importmap">
 {
@@ -16,42 +16,181 @@
 </script>
 
 <style>
-body { margin:0; overflow:hidden; background:#000; font-family:sans-serif; }
+* { box-sizing: border-box; }
+body { 
+  margin: 0; 
+  overflow: hidden; 
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: 'Comic Sans MS', 'Segoe UI', sans-serif;
+  touch-action: none;
+}
+
+/* Стартовый экран с детским дизайном */
 .overlay {
-  position:fixed; inset:0;
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  background:#1e1e1e; z-index:10;
+  position: fixed; 
+  inset: 0;
+  display: flex; 
+  flex-direction: column;
+  align-items: center; 
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 10;
+  padding: 5vh;
 }
+
+.overlay h1 {
+  color: #fff;
+  font-size: clamp(24px, 6vw, 48px);
+  text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+  margin-bottom: 4vh;
+  text-align: center;
+}
+
+/* Адаптивные кнопки */
 button {
-  width:220px; height:64px;
-  font-size:20px; margin:10px;
-  border-radius:16px;
+  width: clamp(180px, 50vw, 280px);
+  height: clamp(50px, 12vh, 80px);
+  font-size: clamp(16px, 4vw, 24px);
+  margin: 1.5vh 0;
+  border-radius: clamp(12px, 3vw, 20px);
+  border: 3px solid #fff;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
 }
+
+button:active {
+  transform: scale(0.95);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+
+/* Кнопки переключения режимов */
 #mode-ui {
-  position:fixed; bottom:12px; left:50%;
-  transform:translateX(-50%);
-  display:flex; gap:10px; z-index:5;
+  position: fixed; 
+  bottom: clamp(12px, 3vh, 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex; 
+  gap: clamp(8px, 2vw, 16px);
+  z-index: 5;
 }
+
 #mode-ui button {
-  width:64px; height:64px; font-size:12px;
-  border-radius:50%;
+  width: clamp(48px, 12vw, 72px);
+  height: clamp(48px, 12vw, 72px);
+  font-size: clamp(20px, 5vw, 32px);
+  border-radius: 50%;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Счетчик машинок */
+#car-counter {
+  position: fixed;
+  top: clamp(12px, 3vh, 24px);
+  right: clamp(12px, 3vh, 24px);
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  padding: clamp(8px, 2vw, 16px);
+  border-radius: clamp(8px, 2vw, 12px);
+  font-size: clamp(14px, 3.5vw, 20px);
+  font-weight: bold;
+  z-index: 5;
+}
+
+/* Панель масштаба */
+#scale-control {
+  position: fixed;
+  top: clamp(12px, 3vh, 24px);
+  left: clamp(12px, 3vh, 24px);
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: clamp(10px, 2.5vw, 16px);
+  border-radius: clamp(8px, 2vw, 12px);
+  font-size: clamp(12px, 3vw, 16px);
+  z-index: 5;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+#scale-control label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+#scale-control input[type="range"] {
+  width: 100%;
+  margin: 8px 0;
+}
+
+#scale-control .scale-value {
+  display: inline-block;
+  background: rgba(255,255,255,0.2);
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-family: monospace;
+}
+
+#scale-control button {
+  width: 100%;
+  height: 36px;
+  font-size: clamp(12px, 3vw, 14px);
+  margin-top: 8px;
+  padding: 0;
+}
+
+/* Загрузка */
+.loading {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  color: #fff;
+  font-size: clamp(18px, 4vw, 28px);
 }
 </style>
 </head>
 
 <body>
 
+<!-- Стартовый экран -->
 <div id="start" class="overlay">
-  <button data-mode="AR">📷 AR</button>
-  <button data-mode="GYRO">🧭 Двигать</button>
+  <h1>🚗 Машинки на Ковре 🎮</h1>
+  <button data-mode="AR">📷 AR Режим</button>
+  <button data-mode="GYRO">🧭 Двигать Телефон</button>
   <button data-mode="TOUCH">✋ Пальцем</button>
 </div>
 
+<!-- Переключение режимов -->
 <div id="mode-ui" hidden>
-  <button data-mode="AR">📷</button>
-  <button data-mode="GYRO">🧭</button>
-  <button data-mode="TOUCH">✋</button>
+  <button data-mode="AR" title="AR Режим">📷</button>
+  <button data-mode="GYRO" title="Гироскоп">🧭</button>
+  <button data-mode="TOUCH" title="Пальцем">✋</button>
+</div>
+
+<!-- Счетчик машинок -->
+<div id="car-counter" hidden>🚗 x 0</div>
+
+<!-- Панель масштаба (ВАЖНО: этот блок должен быть!) -->
+<div id="scale-control" hidden>
+  <label>🔧 Масштаб машинок:</label>
+  <input type="range" id="scale-slider" min="0.005" max="0.10" step="0.001" value="0.015">
+  <div>
+    Текущий: <span class="scale-value" id="scale-display">0.015</span>
+  </div>
+  <button id="apply-scale">✅ Применить</button>
+  <button id="reset-scale">🔄 Сброс</button>
 </div>
 
 <script type="module" src="./src/main.js"></script>
