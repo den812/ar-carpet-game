@@ -7,17 +7,17 @@ export const CarModels = [
     {
         name: 'Buggy',
         url: './assets/models/Buggy.glb',
-        scale: 0.003 // Подберите масштаб опытным путем
+        scale: 0.001 // Подберите масштаб опытным путем
     },
     {
         name: 'Milk Truck',
         url: './assets/models/CesiumMilkTruck.glb',
-        scale: 0.5
+        scale: 0.025
     },
     {
         name: 'Duck',
         url: './assets/models/Duck.glb',
-        scale: 1.0
+        scale: 0.05
     }
 ];
 

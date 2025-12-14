@@ -1,74 +1,86 @@
 import * as THREE from 'three';
 import { MindARThree } from 'mindar-image-three';
+// Импорт GUI
+import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 
-// ИСПРАВЛЕНИЕ 1: Импортируем функцию создания дорог
 import { createRoadNetwork } from './roads/road_system.js';
-
-// ИСПРАВЛЕНИЕ 2: Импортируем класс управления трафиком (вместо CarModels)
 import { TrafficManager } from './traffic/traffic_manager.js';
 
 export const startAR = async () => {
-    // Получаем контейнер для AR
     const container = document.querySelector("#ar-container");
 
-    // Инициализация MindAR
+    // 1. Инициализация MindAR
     const mindarThree = new MindARThree({
         container: container,
-        imageTargetSrc: './assets/carpet.mind', // Файл меток
-        maxTrack: 1, // Отслеживаем только 1 маркер
+        imageTargetSrc: './assets/carpet.mind', 
+        maxTrack: 1, // Один маркер
     });
 
     const { renderer, scene, camera } = mindarThree;
 
-    // --- СВЕТ ---
-    // Добавляем освещение, чтобы 3D модели были видны
+    // 2. Свет (важно для AR)
     const ambientLight = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
     scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    dirLight.position.set(5, 10, 7); // Свет сверху-сбоку
+    dirLight.position.set(5, 10, 7);
+    dirLight.castShadow = true;
     scene.add(dirLight);
 
-    // --- ЯКОРЬ (ANCHOR) ---
-    // Создаем группу, которая будет привязана к ковру
+    // 3. Якорь (Anchor)
     const anchor = mindarThree.addAnchor(0);
+    
+    // Создаем группу, которая будет "сидеть" на ковре
     const gameGroup = new THREE.Group();
     anchor.group.add(gameGroup);
 
-    // --- СОЗДАНИЕ МИРА ---
-    
-    // 1. Создаем дороги и добавляем их в gameGroup
+    // === ЛОГИКА ИГРЫ ===
+
+    // Создаем дорожную сеть внутри gameGroup
     const roadNetwork = createRoadNetwork(gameGroup);
 
-    // 2. Инициализируем менеджер трафика
-    // Передаем ему сцену (или группу) и сеть дорог
+    // Создаем менеджер трафика
     const trafficManager = new TrafficManager(gameGroup, roadNetwork);
 
-    // --- ЗАПУСК AR ---
+    // === GUI (ПАНЕЛЬ УПРАВЛЕНИЯ) ===
+    const gui = new GUI({ title: 'Настройки AR' });
+    const params = {
+        scaleMultiplier: 1.0, // Множитель (Zoom)
+        count: 3,
+        reload: () => {
+            trafficManager.clearTraffic();
+            trafficManager.spawnCars(params.count);
+            trafficManager.setGlobalScale(params.scaleMultiplier);
+        }
+    };
+
+    gui.add(params, 'scaleMultiplier', 0.1, 3.0).name('Zoom Машинок').onChange(val => {
+        trafficManager.setGlobalScale(val);
+    });
+    
+    gui.add(params, 'count', 1, 10).name('Кол-во машин').step(1);
+    
+    gui.add(params, 'reload').name('Сброс / Старт');
+
+    // === ЗАПУСК AR ===
     try {
         await mindarThree.start();
         console.log("AR Engine started");
 
-        // Спавним машины (например, 5 штук)
-        // Вызываем это здесь, чтобы машины появились после старта трекинга
-        if (trafficManager && typeof trafficManager.spawnCars === 'function') {
-            trafficManager.spawnCars(5); 
-        } else {
-            console.error("TrafficManager не имеет метода spawnCars!");
-        }
+        // Стартуем логику после запуска AR
+        params.reload();
 
     } catch (error) {
         console.error("Failed to start AR:", error);
     }
 
-    // --- ИГРОВОЙ ЦИКЛ (RENDER LOOP) ---
+    // === ЦИКЛ РЕНДЕРИНГА ===
     renderer.setAnimationLoop(() => {
-        // Обновляем движение машин
+        // Обновляем машины (движение)
         if (trafficManager) {
             trafficManager.update();
         }
 
-        // Рендерим сцену
         renderer.render(scene, camera);
     });
-}
+};

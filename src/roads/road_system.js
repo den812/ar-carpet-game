@@ -1,5 +1,7 @@
-// Система дорог с разметкой для конкретного ковра
-export class RoadSystem {
+import * as THREE from 'three';
+
+// === ВАШ КЛАСС ЛОГИКИ (БЕЗ ИЗМЕНЕНИЙ, ТОЛЬКО export убран, чтобы экспортировать внизу) ===
+class RoadSystem {
   constructor() {
     this.roads = [];
     this.intersections = [];
@@ -10,8 +12,7 @@ export class RoadSystem {
   }
 
   initializeRoadNetwork() {
-    // Разметка дорог вашего ковра (координаты в нормализованных единицах 0-1)
-    // Дороги с двумя полосами (туда и обратно)
+    // Разметка дорог (0-1)
     
     // Главная горизонтальная дорога (верхняя)
     this.roads.push({
@@ -20,7 +21,7 @@ export class RoadSystem {
       start: { x: 0.1, z: 0.2 },
       end: { x: 0.9, z: 0.2 },
       width: 0.08,
-      priority: 1 // Главная дорога
+      priority: 1
     });
 
     // Главная горизонтальная дорога (нижняя)
@@ -40,7 +41,7 @@ export class RoadSystem {
       start: { x: 0.25, z: 0.1 },
       end: { x: 0.25, z: 0.9 },
       width: 0.08,
-      priority: 0 // Второстепенная
+      priority: 0
     });
 
     // Вертикальная дорога (центральная)
@@ -69,20 +70,16 @@ export class RoadSystem {
   }
 
   generateLanes() {
-    // Генерация полос для каждой дороги (туда и обратно)
     this.roads.forEach(road => {
-      const laneOffset = road.width / 4; // Смещение полосы от центра
+      const laneOffset = road.width / 4; 
       
       if (road.id.startsWith('h')) {
-        // Горизонтальная дорога
-        // Полоса слева направо (верхняя полоса)
         this.lanes.push({
           roadId: road.id,
           direction: 'forward',
           start: { x: road.start.x, z: road.start.z - laneOffset },
           end: { x: road.end.x, z: road.end.z - laneOffset }
         });
-        // Полоса справа налево (нижняя полоса)
         this.lanes.push({
           roadId: road.id,
           direction: 'backward',
@@ -90,15 +87,12 @@ export class RoadSystem {
           end: { x: road.start.x, z: road.start.z + laneOffset }
         });
       } else {
-        // Вертикальная дорога
-        // Полоса сверху вниз (левая полоса)
         this.lanes.push({
           roadId: road.id,
           direction: 'forward',
           start: { x: road.start.x - laneOffset, z: road.start.z },
           end: { x: road.end.x - laneOffset, z: road.end.z }
         });
-        // Полоса снизу вверх (правая полоса)
         this.lanes.push({
           roadId: road.id,
           direction: 'backward',
@@ -110,13 +104,11 @@ export class RoadSystem {
   }
 
   generateIntersections() {
-    // Определение перекрестков (где дороги пересекаются)
     const horizontalRoads = this.roads.filter(r => r.id.startsWith('h'));
     const verticalRoads = this.roads.filter(r => r.id.startsWith('v'));
 
     horizontalRoads.forEach(hRoad => {
       verticalRoads.forEach(vRoad => {
-        // Проверка пересечения
         const intersectionX = vRoad.start.x;
         const intersectionZ = hRoad.start.z;
 
@@ -137,7 +129,6 @@ export class RoadSystem {
   }
 
   placeTrafficSigns() {
-    // Размещение дорожных знаков перед перекрестками
     this.intersections.forEach(intersection => {
       const priorityRoad = this.roads.find(r => r.id === intersection.priority);
       const secondaryRoads = this.roads.filter(
@@ -145,11 +136,8 @@ export class RoadSystem {
       );
 
       secondaryRoads.forEach(road => {
-        // Знак "Уступи дорогу" на второстепенной дороге
-        const approachDistance = 0.05; // Расстояние до перекрестка
-        
+        const approachDistance = 0.05;
         if (road.id.startsWith('v')) {
-          // Вертикальная дорога - знаки сверху и снизу
           this.signs.push({
             type: 'yield',
             position: {
@@ -169,7 +157,6 @@ export class RoadSystem {
         }
       });
 
-      // Знак "Главная дорога" на приоритетной дороге
       if (priorityRoad) {
         if (priorityRoad.id.startsWith('h')) {
           this.signs.push({
@@ -185,7 +172,6 @@ export class RoadSystem {
     });
   }
 
-  // Получить полосу для движения
   getLaneForRoute(startPos, endPos) {
     let bestLane = null;
     let minDistance = Infinity;
@@ -200,28 +186,21 @@ export class RoadSystem {
         bestLane = lane;
       }
     });
-
     return bestLane;
   }
 
-  // Построить маршрут по полосам
   buildRoute(startPos, endPos) {
     const route = [];
     const visited = new Set();
     
-    // Простой алгоритм поиска пути через перекрестки
     const startLane = this.findNearestLane(startPos);
     const endLane = this.findNearestLane(endPos);
 
     if (!startLane || !endLane) return route;
 
-    // Добавляем точки маршрута
     route.push({ ...startLane.start, type: 'start' });
-    
-    // Находим путь через перекрестки
     const path = this.findPathThroughIntersections(startLane, endLane, visited);
     route.push(...path);
-    
     route.push({ ...endLane.end, type: 'end' });
 
     return route;
@@ -230,7 +209,6 @@ export class RoadSystem {
   findNearestLane(pos) {
     let nearest = null;
     let minDist = Infinity;
-
     this.lanes.forEach(lane => {
       const dist = Math.min(
         this.distance2D(pos, lane.start),
@@ -241,19 +219,14 @@ export class RoadSystem {
         nearest = lane;
       }
     });
-
     return nearest;
   }
 
   findPathThroughIntersections(startLane, endLane, visited) {
     const path = [];
-    
-    // Упрощенная логика: движемся по текущей полосе до пересечения
     if (startLane.roadId === endLane.roadId) {
-      // Та же дорога - прямо по полосе
       path.push({ ...startLane.end, type: 'lane_end' });
     } else {
-      // Разные дороги - через перекресток
       const intersection = this.findConnectingIntersection(startLane, endLane);
       if (intersection) {
         path.push({
@@ -265,7 +238,6 @@ export class RoadSystem {
         });
       }
     }
-
     return path;
   }
 
@@ -281,20 +253,82 @@ export class RoadSystem {
     return Math.sqrt(dx * dx + dz * dz);
   }
 
-  // Проверить, нужно ли уступить дорогу на перекрестке
   shouldYieldAtIntersection(carPosition, carLane, intersection) {
     const priorityRoadId = intersection.priority;
-    
-    // Если машина на второстепенной дороге
     if (carLane.roadId !== priorityRoadId) {
       return true;
     }
-    
     return false;
   }
 
-  // Получить все перекрестки на маршруте
   getIntersectionsOnRoute(route) {
     return route.filter(point => point.type === 'intersection');
   }
+}
+
+// === ЭКСПОРТ (ИСПРАВЛЕНИЕ ОШИБКИ) ===
+
+// 1. Экспортируем сам класс, если он понадобится в других файлах
+export { RoadSystem };
+
+// 2. Экспортируем функцию createRoadNetwork, которую вызывает ar.js
+export function createRoadNetwork(scene) {
+    // Создаем логику дорог
+    const roadSystem = new RoadSystem();
+
+    // Материал для асфальта
+    const material = new THREE.MeshStandardMaterial({ 
+        color: 0x444444,
+        roughness: 0.8
+    });
+
+    console.log("Generating road visuals for", roadSystem.roads.length, "roads");
+
+    // Проходим по каждой дороге из логики и рисуем её
+    roadSystem.roads.forEach(road => {
+        // Вычисляем длину дороги
+        const dx = road.end.x - road.start.x;
+        const dz = road.end.z - road.start.z;
+        const length = Math.sqrt(dx * dx + dz * dz);
+
+        // Создаем геометрию (Плоскость)
+        const geometry = new THREE.PlaneGeometry(length, road.width);
+        const mesh = new THREE.Mesh(geometry, material);
+
+        // Позиционирование
+        // Важно: координаты RoadSystem идут от 0 до 1.
+        // MindAR/ThreeJS сцена обычно центрирована в 0,0.
+        // Поэтому смещаем на -0.5
+        const centerX = (road.start.x + road.end.x) / 2 - 0.5;
+        const centerZ = (road.start.z + road.end.z) / 2 - 0.5;
+
+        mesh.position.set(centerX, 0.005, centerZ); // Чуть выше 0, чтобы не мерцало с ковром
+
+        // Поворот
+        const angle = Math.atan2(dz, dx);
+        mesh.rotation.x = -Math.PI / 2; // Лежит плашмя
+        mesh.rotation.z = -angle;       // Поворот по направлению дороги
+
+        mesh.receiveShadow = true;
+
+        // Сохраняем ссылку на меш в логическом объекте (на всякий случай)
+        road.mesh = mesh;
+
+        // Добавляем на сцену
+        scene.add(mesh);
+    });
+
+    // Возвращаем объект системы, но добавляем ему свойство 'length' или итератор,
+    // если TrafficManager написан под массив. 
+    // Лучше всего вернуть массив дорог (roadSystem.roads), так как TrafficManager,
+    // который мы писали ранее, ожидает массив.
+    // НО, чтобы сохранить вашу крутую логику перекрестков, лучше вернуть сам объект,
+    // а TrafficManager обновить.
+    
+    // ДЛЯ СОВМЕСТИМОСТИ С ПРЕДЫДУЩИМ ШАГОМ:
+    // Мы вернем массив дорог, но "прицепим" к нему ссылку на систему.
+    const roadsArray = roadSystem.roads;
+    roadsArray.system = roadSystem; // хак, чтобы иметь доступ к логике
+
+    return roadsArray;
 }

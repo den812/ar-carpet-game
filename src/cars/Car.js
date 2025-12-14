@@ -1,93 +1,116 @@
-export class Car {
-  constructor(mesh, path, startOffset = 0) {
-    this.mesh = mesh;
-    this.path = path;
-    this.t = startOffset; // Начальная позиция на пути (0-1)
-    this.speed = 0.0003 + Math.random() * 0.0002; // Случайная скорость
-    this.stop = false;
-    this.baseY = 0.05; // Высота над ковром
-    this.bobAmount = 0; // Покачивание при движении
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    // Привязка машинки к userData для кликов
-    mesh.userData.car = this;
-    mesh.traverse(node => {
-      if (node.isMesh) {
-        node.userData.car = this;
+export class Car {
+  constructor(scene, modelConfig) {
+    this.scene = scene;
+    this.mesh = null;
+    this.path = null;
+    this.progress = 0;
+    this.speed = 0.0005;
+
+    // Сохраняем базовый масштаб (из конфига или 1.0)
+    this.baseScale = modelConfig.scale || 1.0;
+    // Глобальный множитель (от ползунка GUI)
+    this.globalMultiplier = 1.0;
+    
+    // Сохраняем targetScale, если он был задан до загрузки
+    this.targetScale = null;
+
+    const loader = new GLTFLoader();
+    
+    loader.load(modelConfig.url, (gltf) => {
+      this.mesh = gltf.scene;
+
+      // Применяем масштаб сразу после загрузки
+      // Если globalMultiplier уже был изменен, он применится здесь
+      this.updateScale();
+
+      // Включаем тени
+      this.mesh.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+
+      this.scene.add(this.mesh);
+      
+      // Если маршрут уже был задан, ставим машину на старт
+      if (this.path) {
+          this.updatePosition(this.progress);
       }
+
+    }, undefined, (error) => {
+      console.error('Error loading car model:', error);
     });
   }
 
-  toggle() {
-    this.stop = !this.stop;
-    
-    // Визуальная индикация остановки
-    if (this.stop) {
-      this.mesh.traverse(node => {
-        if (node.isMesh && node.material) {
-          node.material.emissive = new THREE.Color(0xff0000);
-          node.material.emissiveIntensity = 0.3;
-        }
-      });
-    } else {
-      this.mesh.traverse(node => {
-        if (node.isMesh && node.material) {
-          node.material.emissive = new THREE.Color(0x000000);
-          node.material.emissiveIntensity = 0;
-        }
-      });
+  // Вызывается из TrafficManager при движении ползунка
+  setGlobalScale(multiplier) {
+    this.globalMultiplier = multiplier;
+    // Пытаемся обновить, если модель уже есть
+    this.updateScale();
+  }
+
+  updateScale() {
+    // ВАЖНО: Проверка, загрузилась ли модель
+    if (this.mesh) {
+        const finalScale = this.baseScale * this.globalMultiplier;
+        this.mesh.scale.set(finalScale, finalScale, finalScale);
     }
   }
 
-  update(deltaTime) {
-    if (this.stop) {
-      // Машинка стоит, но слегка покачивается
-      this.bobAmount += 0.1;
-      this.mesh.position.y = this.baseY + Math.sin(this.bobAmount) * 0.002;
-      return;
+  setRoute(routePoints) {
+    if (!routePoints || routePoints.length < 2) return;
+
+    // Создаем кривую пути
+    const vectorPoints = routePoints.map(p => new THREE.Vector3(
+        p.x - 0.5, 
+        0.005, // Чуть приподнимаем над дорогой
+        p.z - 0.5
+    ));
+    
+    this.path = new THREE.CatmullRomCurve3(vectorPoints);
+    this.progress = 0;
+    
+    // Пытаемся поставить на старт. 
+    // Если модель еще не загрузилась, updatePosition просто ничего не сделает (благодаря проверке)
+    this.updatePosition(0);
+  }
+
+  setPosition(x, y, z) {
+    // ВАЖНО: Проверка, загрузилась ли модель
+    if (this.mesh) {
+      this.mesh.position.set(x - 0.5, y, z - 0.5);
+    }
+  }
+
+  update() {
+    // Если модели нет ИЛИ пути нет -> выходим
+    if (!this.mesh || !this.path) return;
+
+    this.progress += this.speed;
+
+    // Зацикливаем движение
+    if (this.progress > 1) {
+      this.progress = 0;
     }
 
-    // Движение по пути
-    this.t = (this.t + this.speed * deltaTime) % 1;
-    
-    const currentPoint = this.path.getPointAt(this.t);
-    const nextPoint = this.path.getPointAt((this.t + 0.01) % 1);
-
-    // ИСПРАВЛЕНО: правильное позиционирование
-    this.mesh.position.copy(currentPoint);
-    this.mesh.position.y = this.baseY;
-
-    // Поворот машинки по направлению движения
-    this.mesh.lookAt(nextPoint);
-    
-    // Небольшое покачивание при движении (реалистичность)
-    this.bobAmount += 0.2;
-    this.mesh.position.y += Math.sin(this.bobAmount) * 0.005;
+    this.updatePosition(this.progress);
   }
 
-  // Проверка столкновения с другой машинкой
-  isCollidingWith(otherCar, threshold = 0.15) {
-    const distance = this.mesh.position.distanceTo(otherCar.mesh.position);
-    return distance < threshold;
-  }
+  updatePosition(t) {
+    // ВАЖНО: Самая главная проверка, которая устраняет вашу ошибку
+    if (!this.mesh || !this.path) return;
 
-  // Остановка перед препятствием
-  stopForObstacle() {
-    this.stop = true;
-  }
+    // 1. Получаем точку на кривой
+    const position = this.path.getPointAt(t);
+    this.mesh.position.copy(position);
 
-  // Возобновление движения
-  resume() {
-    this.stop = false;
-  }
-
-  // Получить текущую позицию
-  getPosition() {
-    return this.mesh.position.clone();
-  }
-
-  // Получить направление движения
-  getDirection() {
-    const nextPoint = this.path.getPointAt((this.t + 0.01) % 1);
-    return nextPoint.clone().sub(this.mesh.position).normalize();
+    // 2. Поворачиваем машину по направлению движения
+    const tangent = this.path.getTangentAt(t).normalize();
+    const angle = Math.atan2(-tangent.z, tangent.x);
+    this.mesh.rotation.y = angle + Math.PI / 2;
   }
 }

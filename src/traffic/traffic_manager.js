@@ -1,55 +1,76 @@
-// src/traffic/traffic_manager.js
 import { Car } from '../cars/Car.js';
-
-// ВАЖНО: Используем фигурные скобки, так как экспорт именованный
 import { CarModels } from '../cars/CarModels.js';
 
 export class TrafficManager {
     constructor(scene, roadNetwork) {
         this.scene = scene;
-        this.roadNetwork = roadNetwork;
+        this.roadSystem = roadNetwork.system || (Array.isArray(roadNetwork) ? null : roadNetwork);
+        if (!this.roadSystem && roadNetwork.lanes) this.roadSystem = roadNetwork;
+
         this.cars = [];
+        // Начальное значение ползунка (множитель)
+        // Ставим 1.0, так как теперь базовые размеры прописаны в CarModels
+        this.globalScaleMultiplier = 1.0; 
     }
 
     spawnCars(count) {
-        if (!this.roadNetwork || this.roadNetwork.length === 0) {
-            console.warn("Нет дорог для создания машин!");
-            return;
-        }
+        if (!this.roadSystem) console.warn("No RoadSystem found");
 
-        console.log(`Создаем ${count} машин...`);
         for (let i = 0; i < count; i++) {
-            // Выбираем случайную модель из списка
             const modelConfig = CarModels[Math.floor(Math.random() * CarModels.length)];
-            
-            // Создаем машину
             const car = new Car(this.scene, modelConfig);
             
-            // --- ЛОГИКА РАЗМЕЩЕНИЯ ---
-            // Берем случайную дорогу
-            const randomRoad = this.roadNetwork[Math.floor(Math.random() * this.roadNetwork.length)];
-            
-            // Если у дороги есть координаты начала (примерная логика)
-            if (randomRoad) {
-                // Если roadNetwork хранит объекты Three.js (Mesh/Group)
-                if (randomRoad.position) {
-                     car.setPosition(randomRoad.position.x, 0.1, randomRoad.position.z);
-                } 
-                // Если roadNetwork хранит просто координаты точек
-                else if (randomRoad.x !== undefined && randomRoad.z !== undefined) {
-                     car.setPosition(randomRoad.x, 0.1, randomRoad.z);
+            // Сразу применяем текущий глобальный множитель
+            car.setGlobalScale(this.globalScaleMultiplier);
+
+            if (this.roadSystem) {
+                const route = this.generateRandomRoute();
+                if (route) {
+                    car.setRoute(route);
+                    car.progress = Math.random();
+                } else {
+                    car.setPosition(0, 0, 0);
                 }
             } else {
-                car.setPosition(i * 0.5, 0, 0); // Фоллбэк, если дорог нет
+                car.setPosition((i - count/2) * 0.2, 0, 0);
             }
-
             this.cars.push(car);
         }
     }
 
+    // Этот метод вызывается из GUI (ползунок)
+    setGlobalScale(val) {
+        this.globalScaleMultiplier = val;
+        this.cars.forEach(car => {
+            // Передаем значение в метод машины
+            car.setGlobalScale(val);
+        });
+    }
+
+    clearTraffic() {
+        this.cars.forEach(car => {
+            if (car.mesh) {
+                this.scene.remove(car.mesh);
+                if (car.mesh.geometry) car.mesh.geometry.dispose();
+            }
+        });
+        this.cars = [];
+    }
+
+    generateRandomRoute() {
+        if (!this.roadSystem || !this.roadSystem.lanes) return null;
+        const lanes = this.roadSystem.lanes;
+        const start = lanes[Math.floor(Math.random() * lanes.length)];
+        const end = lanes[Math.floor(Math.random() * lanes.length)];
+        if (typeof this.roadSystem.buildRoute === 'function') {
+            return this.roadSystem.buildRoute(start.start, end.end);
+        }
+        return null;
+    }
+
     update() {
         this.cars.forEach(car => {
-            if (car.update) car.update();
+            if (car && car.update) car.update();
         });
     }
 }
