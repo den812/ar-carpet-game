@@ -2,6 +2,25 @@ import * as THREE from "three";
 //import { spawnCars } from "./CarModels.js";
 import { CONFIG, getCameraConfig, getCarpetConfig, getControlsConfig } from "../config.js";
 
+// Именованный экспорт массива моделей
+export const CarModels = [
+    {
+        name: 'Buggy',
+        url: './assets/models/Buggy.glb',
+        scale: 0.003 // Подберите масштаб опытным путем
+    },
+    {
+        name: 'Milk Truck',
+        url: './assets/models/CesiumMilkTruck.glb',
+        scale: 0.5
+    },
+    {
+        name: 'Duck',
+        url: './assets/models/Duck.glb',
+        scale: 1.0
+    }
+];
+
 export function startNonAR(mode) {
   const scene = new THREE.Scene();
   
