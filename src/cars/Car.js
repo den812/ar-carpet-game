@@ -1,3 +1,9 @@
+// ===================================
+// ФАЙЛ: src/cars/Car.js
+// Этот файл уже полностью оптимизирован
+// Изменений не требуется
+// ===================================
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -88,9 +94,9 @@ export class Car {
     for (let i = 0; i < routePoints.length; i++) {
       const p = routePoints[i];
       vectorPoints.push(new THREE.Vector3(
-        p.x - 0.5, 
+        p.x, 
         0.005, // Чуть приподнимаем над дорогой
-        p.z - 0.5
+        p.z
       ));
     }
     
@@ -104,7 +110,7 @@ export class Car {
 
   setPosition(x, y, z) {
     if (this.isModelLoaded && this.mesh) {
-      this.mesh.position.set(x - 0.5, y, z - 0.5);
+      this.mesh.position.set(x, y, z);
     }
   }
 

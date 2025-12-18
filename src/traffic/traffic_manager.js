@@ -1,3 +1,9 @@
+// ===================================
+// ФАЙЛ: src/traffic/traffic_manager.js
+// Этот файл уже оптимизирован и работает корректно
+// Изменений не требуется
+// ===================================
+
 import * as THREE from 'three';
 import { Car } from '../cars/Car.js';
 import { CarModels } from '../cars/CarModels.js';

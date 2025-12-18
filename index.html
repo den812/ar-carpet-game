@@ -8,7 +8,7 @@
   />
   <title>AR Carpet Game</title>
 
-  <!-- ===== IMPORT MAP (КРИТИЧНО) ===== -->
+  <!-- ===== IMPORT MAP ===== -->
   <script type="importmap">
   {
     "imports": {
@@ -28,9 +28,10 @@
       height: 100%;
       overflow: hidden;
       background: #000;
-      font-family: sans-serif;
+      font-family: 'Arial', sans-serif;
     }
 
+    /* ✅ AR контейнер */
     #ar-container {
       position: absolute;
       inset: 0;
@@ -38,45 +39,185 @@
       touch-action: none;
     }
 
-    #start,
-    #mode-ui {
+    /* ✅ Canvas для nonAR режимов */
+    canvas {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 1 !important;
+      display: block !important;
+    }
+
+    /* ✅ Стартовый экран */
+    #start {
       position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 1000;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      pointer-events: all;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 30px;
+      border-radius: 15px;
+      border: 3px solid #00ff00;
+      box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+    }
+
+    #start h2 {
+      color: #00ff00;
+      text-align: center;
+      margin: 0 0 15px 0;
+      font-size: 24px;
+      text-shadow: 0 0 10px #00ff00;
+    }
+
+    .mode-buttons {
       display: flex;
       gap: 10px;
+      justify-content: center;
+    }
+
+    .settings {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 15px;
+      border-top: 2px solid #00ff00;
+      margin-top: 10px;
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #00ff00;
+      font-size: 14px;
+    }
+
+    .setting-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    /* ✅ Переключатель режимов */
+    #mode-ui {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      display: flex;
+      gap: 10px;
+      pointer-events: all;
     }
 
     #mode-ui[hidden] {
-      display: none;
+      display: none !important;
     }
 
+    /* ✅ Стили кнопок */
     button {
-      padding: 10px 16px;
-      font-size: 16px;
+      padding: 15px 25px;
+      font-size: 18px;
+      font-weight: bold;
       cursor: pointer;
+      background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+      color: #000;
+      border: 3px solid #00ff00;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 255, 0, 0.4);
+      transition: all 0.2s;
+      pointer-events: all;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    button:hover {
+      background: linear-gradient(135deg, #00ff00 0%, #00ee00 100%);
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0, 255, 0, 0.6);
+    }
+
+    button:active {
+      transform: scale(0.95);
+    }
+
+    #mode-ui button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background: rgba(255, 255, 255, 0.95);
+      color: #333;
+      border: 2px solid #333;
+    }
+
+    #mode-ui button:hover {
+      background: rgba(200, 255, 200, 0.95);
+    }
+
+    /* ✅ Мобильная адаптация */
+    @media (max-width: 768px) {
+      #start {
+        width: 90%;
+        max-width: 400px;
+        padding: 20px;
+      }
+
+      #start h2 {
+        font-size: 20px;
+      }
+
+      button {
+        padding: 12px 20px;
+        font-size: 16px;
+      }
+
+      .mode-buttons {
+        flex-direction: column;
+      }
     }
   </style>
 </head>
 
 <body>
 
+  <!-- AR контейнер -->
   <div id="ar-container"></div>
 
+  <!-- Стартовый экран -->
   <div id="start">
-    <button data-mode="AR">AR</button>
-    <button data-mode="TOUCH">TOUCH</button>
-    <button data-mode="GYRO">GYRO</button>
+    <h2>🎮 AR CARPET GAME</h2>
+    
+    <div class="mode-buttons">
+      <button data-mode="AR">📱 AR</button>
+      <button data-mode="TOUCH">👆 TOUCH</button>
+      <button data-mode="GYRO">🔄 GYRO</button>
+    </div>
+
+    <div class="settings">
+      <div class="setting-item">
+        <input type="checkbox" id="stats-toggle" checked />
+        <label for="stats-toggle">Показать статистику</label>
+      </div>
+      <div class="setting-item">
+        <input type="checkbox" id="invert-toggle" />
+        <label for="invert-toggle">Инверсия управления</label>
+      </div>
+    </div>
   </div>
 
+  <!-- Переключатель режимов -->
   <div id="mode-ui" hidden>
-    <button data-mode="AR">AR</button>
-    <button data-mode="TOUCH">TOUCH</button>
-    <button data-mode="GYRO">GYRO</button>
+    <button data-mode="AR">📱 AR</button>
+    <button data-mode="TOUCH">👆 TOUCH</button>
+    <button data-mode="GYRO">🔄 GYRO</button>
   </div>
 
-  <!-- ОСНОВНОЙ ВХОД -->
+  <!-- Основной скрипт -->
   <script type="module" src="./src/main.js"></script>
 
 </body>

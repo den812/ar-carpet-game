@@ -1,65 +1,126 @@
+// ===================================
+// ФАЙЛ: src/ar.js V2
+// ДОБАВЛЕНО:
+// - Поддержка настроек (showStats)
+// - Улучшенная обработка ошибок
+// ===================================
+
 import * as THREE from 'three';
 import { MindARThree } from 'mindar-image-three';
-import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 import { createRoadNetwork } from './roads/road_system.js';
 import { TrafficManager } from './traffic/traffic_manager.js';
+import { StatsPanel } from './ui/StatsPanel.js';
 
-export const startAR = async () => {
+export const startAR = async (settings = {}) => {
   const container = document.querySelector("#ar-container");
+  const showStats = settings.showStats !== false;
 
-  const mindarThree = new MindARThree({
-    container,
-    imageTargetSrc: '/assets/carpet.mind', // КРИТИЧНО: абсолютный путь
-    maxTrack: 1
-  });
+  try {
+    const mindarThree = new MindARThree({
+      container,
+      imageTargetSrc: './assets/carpet.mind',
+      maxTrack: 1
+    });
 
-  const { renderer, scene, camera } = mindarThree;
+    const { renderer, scene, camera } = mindarThree;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
-  const dl = new THREE.DirectionalLight(0xffffff, 1.5);
-  dl.position.set(5, 10, 7);
-  scene.add(dl);
+    // Освещение
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
+    const dl = new THREE.DirectionalLight(0xffffff, 1.5);
+    dl.position.set(5, 10, 7);
+    scene.add(dl);
 
-  const anchor = mindarThree.addAnchor(0);
-  const gameGroup = new THREE.Group();
-  anchor.group.add(gameGroup);
+    // Создаем anchor для AR
+    const anchor = mindarThree.addAnchor(0);
+    const gameGroup = new THREE.Group();
+    anchor.group.add(gameGroup);
 
-  const roadNetwork = createRoadNetwork(gameGroup);
-  const trafficManager = new TrafficManager(gameGroup, roadNetwork);
+    // Создаем дороги и машины
+    const roadNetwork = createRoadNetwork(gameGroup);
+    const trafficManager = new TrafficManager(gameGroup, roadNetwork);
 
-  // 🚗 АВТОСТАРТ МАШИН
-  trafficManager.spawnCars(5);
-  trafficManager.setGlobalScale(1.0);
-
-  // pinch zoom
-  let lastDist = null;
-  container.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      lastDist = Math.hypot(dx, dy);
+    // ✅ Панель статистики (опционально)
+    let statsPanel = null;
+    if (showStats) {
+      statsPanel = new StatsPanel();
+      statsPanel.show();
     }
-  }, { passive: true });
 
-  container.addEventListener('touchmove', e => {
-    if (e.touches.length === 2 && lastDist !== null) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const d = Math.hypot(dx, dy);
-      const delta = (d - lastDist) * 0.005;
-      trafficManager.setGlobalScale(
-        Math.max(0.1, trafficManager.globalScale + delta)
-      );
-      lastDist = d;
-    }
-  }, { passive: true });
+    // 🚗 Автоматический спавн машин
+    trafficManager.spawnCars(5);
+    trafficManager.setGlobalScale(1.0);
 
-  container.addEventListener('touchend', () => lastDist = null);
+    // ✅ PINCH ZOOM
+    let lastDist = null;
 
-  await mindarThree.start();
+    container.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastDist = Math.hypot(dx, dy);
+      }
+    }, { passive: true });
 
-  renderer.setAnimationLoop(() => {
-    trafficManager.update();
-    renderer.render(scene, camera);
-  });
+    container.addEventListener('touchmove', e => {
+      if (e.touches.length === 2 && lastDist !== null) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const currentDist = Math.hypot(dx, dy);
+        
+        const delta = (currentDist - lastDist) * 0.005;
+        const currentScale = trafficManager.globalScaleMultiplier || 1.0;
+        const newScale = Math.max(0.1, Math.min(3.0, currentScale + delta));
+        
+        trafficManager.setGlobalScale(newScale);
+        lastDist = currentDist;
+      }
+    }, { passive: true });
+
+    container.addEventListener('touchend', e => {
+      if (e.touches.length < 2) {
+        lastDist = null;
+      }
+    }, { passive: true });
+
+    // Запускаем AR
+    await mindarThree.start();
+    console.log('✅ AR режим запущен успешно');
+
+    // ✅ Переменная для отслеживания статуса трекинга
+    let isTracking = false;
+
+    // Отслеживание target found/lost
+    anchor.onTargetFound = () => {
+      isTracking = true;
+      console.log('🎯 Target found');
+    };
+
+    anchor.onTargetLost = () => {
+      isTracking = false;
+      console.log('❌ Target lost');
+    };
+
+    // Анимационный цикл
+    renderer.setAnimationLoop(() => {
+      trafficManager.update();
+      
+      if (statsPanel) {
+        const stats = trafficManager.getStats();
+        statsPanel.update({
+          mode: 'AR',
+          tracking: isTracking,
+          paused: false,
+          cars: stats.activeCars,
+          pooled: stats.pooledCars,
+          scale: trafficManager.globalScaleMultiplier.toFixed(2)
+        });
+      }
+      
+      renderer.render(scene, camera);
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка запуска AR:', error);
+    throw error; // Пробрасываем ошибку для fallback в main.js
+  }
 };
