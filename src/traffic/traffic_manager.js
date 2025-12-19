@@ -1,1 +1,1 @@
-placeholder
+// Placeholder to fetch current content
