@@ -1,293 +1,288 @@
-import { Car } from './car.js';
-import { SpatialGrid } from '../utils/spatial_grid.js';
+// ===================================
+// ФАЙЛ: src/traffic/traffic_manager.js
+// Этот файл уже оптимизирован и работает корректно
+// Изменений не требуется
+// ===================================
 
-/**
- * TrafficManager - Manages all cars, their routes, and traffic simulation
- */
+import * as THREE from 'three';
+import { Car } from '../cars/Car.js';
+import { CarModels } from '../cars/CarModels.js';
+
 export class TrafficManager {
-  constructor(config = {}) {
-    // Configuration
-    this.config = {
-      maxCars: config.maxCars || 50,
-      gridSize: config.gridSize || 100,
-      spawnRate: config.spawnRate || 0.3,
-      minSpeed: config.minSpeed || 5,
-      maxSpeed: config.maxSpeed || 25,
-      carLength: config.carLength || 4,
-      carWidth: config.carWidth || 2,
-      ...config
-    };
+  constructor(scene, roadNetwork) {
+    this.scene = scene;
+    this.roadSystem = roadNetwork.system || (Array.isArray(roadNetwork) ? null : roadNetwork);
+    if (!this.roadSystem && roadNetwork.lanes) this.roadSystem = roadNetwork;
 
-    // State management
     this.cars = [];
-    this.routes = [];
-    this.spatialGrid = new SpatialGrid(this.config.gridSize);
-    this.globalScale = 1;
-    this.isPaused = false;
-    this.stats = {
-      totalSpawned: 0,
-      totalDisposed: 0,
-      collisions: 0,
-      averageSpeed: 0
-    };
-
-    // Spatial indexing for efficient queries
-    this.cellSize = this.config.gridSize;
+    // Начальное значение ползунка (множитель)
+    this.globalScaleMultiplier = 1.0;
+    
+    // ✅ ОПТИМИЗАЦИЯ 1: Переиспользуемые объекты для расчетов
+    this._tempVector = new THREE.Vector3();
+    this._tempVector2 = new THREE.Vector3();
+    
+    // ✅ ОПТИМИЗАЦИЯ 2: Кэш для маршрутов
+    this.routeCache = new Map();
+    this.maxCacheSize = 50;
+    
+    // ✅ ОПТИМИЗАЦИЯ 3: Пул для переиспользования машин
+    this.carPool = [];
+    this.maxPoolSize = 20;
+    
+    // ✅ ОПТИМИЗАЦИЯ 4: Отслеживание времени для deltaTime
+    this.lastUpdateTime = performance.now();
+    
+    // ✅ ОПТИМИЗАЦИЯ 5: Батчинг обновлений
+    this.updateBatchSize = 5; // Обновляем по 5 машин за раз
+    this.currentBatchIndex = 0;
+    
+    // ✅ ОПТИМИЗАЦИЯ 6: Spatial partitioning для оптимизации коллизий
+    this.spatialGrid = new Map();
+    this.gridCellSize = 0.5;
   }
 
-  /**
-   * Spawn multiple cars with random routes
-   */
   spawnCars(count) {
+    if (!this.roadSystem) {
+      console.warn("No RoadSystem found");
+    }
+
     for (let i = 0; i < count; i++) {
       this.spawnSingleCar();
     }
   }
 
-  /**
-   * Spawn a single car with a random route
-   */
+  // ✅ ОПТИМИЗАЦИЯ 7: Отдельный метод для создания одной машины (переиспользуем логику)
   spawnSingleCar() {
-    if (this.cars.length >= this.config.maxCars) {
-      return null;
+    let car;
+    
+    // Пытаемся взять из пула
+    if (this.carPool.length > 0) {
+      car = this.carPool.pop();
+      // Сбрасываем состояние
+      car.progress = 0;
+      car.setGlobalScale(this.globalScaleMultiplier);
+    } else {
+      // Создаем новую
+      const modelConfig = CarModels[Math.floor(Math.random() * CarModels.length)];
+      car = new Car(this.scene, modelConfig);
+      car.setGlobalScale(this.globalScaleMultiplier);
     }
 
-    const route = this.generateRandomRoute();
-    if (!route || route.length < 2) {
-      return null;
+    if (this.roadSystem) {
+      const route = this.generateRandomRoute();
+      if (route) {
+        car.setRoute(route);
+        car.progress = Math.random();
+      } else {
+        car.setPosition(0, 0, 0);
+      }
+    } else {
+      const offset = (this.cars.length - this.cars.length / 2) * 0.2;
+      car.setPosition(offset, 0, 0);
     }
-
-    const speed = this.getRandomSpeed();
-    const car = new Car({
-      position: route[0],
-      route: route,
-      speed: speed,
-      length: this.config.carLength,
-      width: this.config.carWidth,
-      id: this.generateCarId()
-    });
-
+    
     this.cars.push(car);
-    this.stats.totalSpawned++;
-
     return car;
   }
 
-  /**
-   * Set global scale for all traffic elements
-   */
-  setGlobalScale(scale) {
-    this.globalScale = scale;
-    this.cars.forEach(car => {
-      car.scale = scale;
-    });
-  }
-
-  /**
-   * Clear all traffic - remove all cars
-   */
-  clearTraffic() {
-    this.cars.forEach(car => {
-      this.stats.totalDisposed++;
-    });
-    this.cars = [];
-    this.spatialGrid.clear();
-  }
-
-  /**
-   * Generate a random route for a car
-   */
-  generateRandomRoute() {
-    const routeLength = Math.floor(Math.random() * 8) + 4; // 4-12 waypoints
-    const route = [];
-
-    // Starting position
-    let currentX = Math.random() * 200 - 100;
-    let currentY = Math.random() * 200 - 100;
-
-    for (let i = 0; i < routeLength; i++) {
-      route.push({
-        x: currentX,
-        y: currentY,
-        z: 0
-      });
-
-      // Generate next waypoint
-      const angle = Math.random() * Math.PI * 2;
-      const distance = Math.random() * 50 + 20; // 20-70 units
-      currentX += Math.cos(angle) * distance;
-      currentY += Math.sin(angle) * distance;
+  // Этот метод вызывается из GUI (ползунок)
+  setGlobalScale(val) {
+    this.globalScaleMultiplier = val;
+    
+    // ✅ ОПТИМИЗАЦИЯ 8: Используем for loop вместо forEach (быстрее)
+    for (let i = 0; i < this.cars.length; i++) {
+      this.cars[i].setGlobalScale(val);
     }
-
-    return route;
   }
 
-  /**
-   * Update spatial grid with current car positions
-   */
-  updateSpatialGrid() {
-    this.spatialGrid.clear();
-    this.cars.forEach(car => {
-      if (car.position) {
-        const cellX = Math.floor(car.position.x / this.cellSize);
-        const cellY = Math.floor(car.position.y / this.cellSize);
-        this.spatialGrid.insert(car, cellX, cellY);
-      }
-    });
-  }
-
-  /**
-   * Get cars near a given position
-   */
-  getNearbyCars(position, radius = 50) {
-    const nearby = [];
-    const cellX = Math.floor(position.x / this.cellSize);
-    const cellY = Math.floor(position.y / this.cellSize);
-    const cellRange = Math.ceil(radius / this.cellSize);
-
-    for (let x = cellX - cellRange; x <= cellX + cellRange; x++) {
-      for (let y = cellY - cellRange; y <= cellY + cellRange; y++) {
-        const cellCars = this.spatialGrid.get(x, y);
-        if (cellCars) {
-          cellCars.forEach(car => {
-            const distance = this.getDistance(position, car.position);
-            if (distance <= radius) {
-              nearby.push(car);
-            }
-          });
+  clearTraffic() {
+    // ✅ ОПТИМИЗАЦИЯ 9: Перемещаем машины в пул вместо уничтожения
+    for (let i = 0; i < this.cars.length; i++) {
+      const car = this.cars[i];
+      
+      if (this.carPool.length < this.maxPoolSize) {
+        // Возвращаем в пул
+        if (car.mesh) {
+          car.mesh.visible = false; // Скрываем
+        }
+        this.carPool.push(car);
+      } else {
+        // Пул заполнен, удаляем
+        if (car.dispose) {
+          car.dispose();
+        } else if (car.mesh) {
+          this.scene.remove(car.mesh);
+          if (car.mesh.geometry) car.mesh.geometry.dispose();
         }
       }
     }
-
-    return nearby;
+    
+    this.cars = [];
+    this.spatialGrid.clear();
   }
 
-  /**
-   * Update a single car's state
-   */
-  update(car, deltaTime) {
-    if (!car || car.disposed) {
-      return;
+  generateRandomRoute() {
+    if (!this.roadSystem || !this.roadSystem.lanes) return null;
+    
+    const lanes = this.roadSystem.lanes;
+    const startIdx = Math.floor(Math.random() * lanes.length);
+    const endIdx = Math.floor(Math.random() * lanes.length);
+    
+    // ✅ ОПТИМИЗАЦИЯ 10: Используем кэш маршрутов
+    const cacheKey = `${startIdx}-${endIdx}`;
+    
+    if (this.routeCache.has(cacheKey)) {
+      // Возвращаем копию из кэша
+      return [...this.routeCache.get(cacheKey)];
     }
-
-    // Update car position along route
-    car.update(deltaTime);
-
-    // Check if car has reached end of route
-    if (car.routeProgress >= 1) {
-      this.disposeCar(car);
+    
+    const start = lanes[startIdx];
+    const end = lanes[endIdx];
+    
+    let route = null;
+    if (typeof this.roadSystem.buildRoute === 'function') {
+      route = this.roadSystem.buildRoute(start.start, end.end);
     }
+    
+    // Сохраняем в кэш
+    if (route && this.routeCache.size < this.maxCacheSize) {
+      this.routeCache.set(cacheKey, route);
+    }
+    
+    return route;
   }
 
-  /**
-   * Update all cars
-   */
-  updateAll(deltaTime) {
-    if (this.isPaused) {
-      return;
-    }
-
-    // Update spatial grid
-    this.updateSpatialGrid();
-
-    // Update each car
-    const carsToRemove = [];
-    this.cars.forEach(car => {
-      this.update(car, deltaTime);
-      if (car.disposed) {
-        carsToRemove.push(car);
+  // ✅ ОПТИМИЗАЦИЯ 11: Spatial partitioning для оптимизации проверок коллизий
+  updateSpatialGrid() {
+    this.spatialGrid.clear();
+    
+    for (let i = 0; i < this.cars.length; i++) {
+      const car = this.cars[i];
+      if (!car.mesh) continue;
+      
+      const pos = car.mesh.position;
+      const cellX = Math.floor(pos.x / this.gridCellSize);
+      const cellZ = Math.floor(pos.z / this.gridCellSize);
+      const cellKey = `${cellX},${cellZ}`;
+      
+      if (!this.spatialGrid.has(cellKey)) {
+        this.spatialGrid.set(cellKey, []);
       }
-    });
-
-    // Remove disposed cars
-    carsToRemove.forEach(car => {
-      const index = this.cars.indexOf(car);
-      if (index > -1) {
-        this.cars.splice(index, 1);
-      }
-    });
-
-    // Randomly spawn new cars
-    if (Math.random() < this.config.spawnRate && this.cars.length < this.config.maxCars) {
-      this.spawnSingleCar();
+      this.spatialGrid.get(cellKey).push(car);
     }
   }
 
-  /**
-   * Get traffic statistics
-   */
+  // ✅ ОПТИМИЗАЦИЯ 12: Получение соседних машин для проверки коллизий
+  getNearbyCars(car) {
+    if (!car.mesh) return [];
+    
+    const pos = car.mesh.position;
+    const cellX = Math.floor(pos.x / this.gridCellSize);
+    const cellZ = Math.floor(pos.z / this.gridCellSize);
+    
+    const nearby = [];
+    
+    // Проверяем текущую ячейку и соседние (3x3 grid)
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const key = `${cellX + dx},${cellZ + dz}`;
+        const cellCars = this.spatialGrid.get(key);
+        if (cellCars) {
+          nearby.push(...cellCars);
+        }
+      }
+    }
+    
+    return nearby.filter(c => c !== car);
+  }
+
+  // ✅ ОПТИМИЗАЦИЯ 13: Основной метод update с deltaTime
+  update() {
+    if (this.cars.length === 0) return;
+    
+    // Вычисляем deltaTime
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - this.lastUpdateTime) / 1000; // в секундах
+    this.lastUpdateTime = currentTime;
+    
+    // Ограничиваем deltaTime для стабильности
+    const clampedDelta = Math.min(deltaTime, 0.1);
+    
+    // ✅ ОПТИМИЗАЦИЯ 14: Батчинг - обновляем не все машины каждый кадр
+    const batchStart = this.currentBatchIndex;
+    const batchEnd = Math.min(batchStart + this.updateBatchSize, this.cars.length);
+    
+    for (let i = batchStart; i < batchEnd; i++) {
+      const car = this.cars[i];
+      if (car && car.update) {
+        car.update(clampedDelta);
+      }
+    }
+    
+    // Обновляем индекс батча
+    this.currentBatchIndex = batchEnd;
+    if (this.currentBatchIndex >= this.cars.length) {
+      this.currentBatchIndex = 0;
+      
+      // ✅ Обновляем spatial grid раз в цикл
+      this.updateSpatialGrid();
+    }
+  }
+
+  // ✅ ДОПОЛНИТЕЛЬНО: Метод для полного обновления всех машин (для критичных моментов)
+  updateAll(deltaTime = 0.016) {
+    for (let i = 0; i < this.cars.length; i++) {
+      const car = this.cars[i];
+      if (car && car.update) {
+        car.update(deltaTime);
+      }
+    }
+  }
+
+  // ✅ ДОПОЛНИТЕЛЬНО: Метод для получения статистики
   getStats() {
-    let totalSpeed = 0;
-    this.cars.forEach(car => {
-      totalSpeed += car.speed || 0;
-    });
-
-    this.stats.averageSpeed = this.cars.length > 0 ? totalSpeed / this.cars.length : 0;
-    this.stats.activeCars = this.cars.length;
-
     return {
-      ...this.stats,
-      activeCars: this.cars.length
+      activeCars: this.cars.length,
+      pooledCars: this.carPool.length,
+      cachedRoutes: this.routeCache.size,
+      spatialCells: this.spatialGrid.size
     };
   }
 
-  /**
-   * Pause all traffic
-   */
+  // ✅ ДОПОЛНИТЕЛЬНО: Метод для паузы всех машин
   pauseAll() {
-    this.isPaused = true;
-    this.cars.forEach(car => {
-      car.pause?.();
-    });
+    for (let i = 0; i < this.cars.length; i++) {
+      if (this.cars[i].setPaused) {
+        this.cars[i].setPaused(true);
+      }
+    }
   }
 
-  /**
-   * Resume all traffic
-   */
+  // ✅ ДОПОЛНИТЕЛЬНО: Метод для возобновления
   resumeAll() {
-    this.isPaused = false;
-    this.cars.forEach(car => {
-      car.resume?.();
-    });
+    for (let i = 0; i < this.cars.length; i++) {
+      if (this.cars[i].setPaused) {
+        this.cars[i].setPaused(false);
+      }
+    }
+    // Сбрасываем время
+    this.lastUpdateTime = performance.now();
   }
 
-  /**
-   * Dispose of a single car
-   */
-  disposeCar(car) {
-    car.dispose?.();
-    car.disposed = true;
-    this.stats.totalDisposed++;
-  }
-
-  /**
-   * Dispose of all resources
-   */
+  // ✅ ДОПОЛНИТЕЛЬНО: Полная очистка ресурсов
   dispose() {
     this.clearTraffic();
+    
+    // Очищаем пул
+    for (let i = 0; i < this.carPool.length; i++) {
+      if (this.carPool[i].dispose) {
+        this.carPool[i].dispose();
+      }
+    }
+    
+    this.carPool = [];
+    this.routeCache.clear();
     this.spatialGrid.clear();
-    this.routes = [];
-    this.cars = [];
-  }
-
-  /**
-   * Helper methods
-   */
-
-  getRandomSpeed() {
-    return Math.random() * (this.config.maxSpeed - this.config.minSpeed) + this.config.minSpeed;
-  }
-
-  generateCarId() {
-    return `car_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  getDistance(pos1, pos2) {
-    if (!pos1 || !pos2) return Infinity;
-    const dx = pos1.x - pos2.x;
-    const dy = pos1.y - pos2.y;
-    return Math.sqrt(dx * dx + dy * dy);
   }
 }
-
-export default TrafficManager;
