@@ -1,7 +1,8 @@
 // ===================================
-// ФАЙЛ: src/main.js V2
-// ИЗМЕНЕНО:
-// - Передача настроек (showStats, invertControls) в режимы
+// ФАЙЛ: src/main.js V3
+// ИСПРАВЛЕНО:
+// - Лучшие сообщения об ошибках AR
+// - Автоматический fallback на TOUCH
 // ===================================
 
 import { startAR } from "./ar.js";
@@ -17,8 +18,21 @@ function run(mode, settings = {}) {
 
   if (mode === "AR") {
     startAR(settings).catch(err => {
-      console.warn("AR не запустился, fallback TOUCH", err);
-      alert("AR режим не поддерживается на этом устройстве. Переключаюсь на TOUCH.");
+      console.warn("❌ AR не запустился:", err);
+      
+      // Показываем понятное сообщение
+      const message = err.userMessage || 
+        "AR режим не поддерживается.\n\nВозможные причины:\n" +
+        "• Требуется HTTPS (сейчас HTTP)\n" +
+        "• Нет доступа к камере\n" +
+        "• Браузер не поддерживает WebXR\n\n" +
+        "Переключаюсь на TOUCH режим.";
+      
+      alert(message);
+      
+      // Автоматический fallback на TOUCH
+      currentMode = "TOUCH";
+      localStorage.setItem("mode", "TOUCH");
       startNonAR("TOUCH", settings);
     });
   } else {
@@ -34,7 +48,8 @@ function changeMode(mode) {
   // Читаем текущие настройки
   const settings = {
     showStats: localStorage.getItem('showStats') !== 'false',
-    invertControls: localStorage.getItem('invertControls') === 'true'
+    invertControls: localStorage.getItem('invertControls') === 'true',
+    showRoads: localStorage.getItem('showRoads') === 'true'
   };
   
   location.reload(); // простой и надежный reset сцены

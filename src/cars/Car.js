@@ -1,217 +1,202 @@
 // ===================================
-// ФАЙЛ: src/cars/Car.js
-// Этот файл уже полностью оптимизирован
-// Изменений не требуется
+// ФАЙЛ: src/cars/Car.js V3
+// ДОБАВЛЕНО:
+// - Движение по правой полосе
+// - Учет смещения полосы
+// - Правостороннее движение
 // ===================================
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { getCarScale } from '../config.js';
 
 export class Car {
-  constructor(scene, modelConfig) {
-    this.scene = scene;
-    this.mesh = null;
-    this.path = null;
+  constructor(model, roadNetwork, modelName = 'unknown') {
+    this.model = model;
+    this.roadNetwork = roadNetwork;
+    this.modelName = modelName;
+    
+    const scale = getCarScale(modelName);
+    this.model.scale.setScalar(scale);
+    
+    this.baseSpeed = 0.0003 + Math.random() * 0.0002;
+    this.currentSpeed = this.baseSpeed;
+    this.maxSpeed = this.baseSpeed * 1.5;
+    this.minSpeed = this.baseSpeed * 0.5;
+    
+    this.heightAboveRoad = 0.05;
+    
+    this.path = [];
+    this.currentPathIndex = 0;
     this.progress = 0;
-    this.speed = 0.0005;
-
-    // Сохраняем базовый масштаб (из конфига или 1.0)
-    this.baseScale = modelConfig.scale || 1.0;
-    // Глобальный множитель (от ползунка GUI)
-    this.globalMultiplier = 1.0;
     
-    // Сохраняем targetScale, если он был задан до загрузки
-    this.targetScale = null;
-
-    // ✅ ОПТИМИЗАЦИЯ 1: Переиспользуемые объекты (не создаются каждый кадр)
-    this._tempPosition = new THREE.Vector3();
-    this._tempTangent = new THREE.Vector3();
-    this._tempQuaternion = new THREE.Quaternion();
+    // ✅ НОВОЕ: текущая полоса движения
+    this.currentLane = null;
     
-    // ✅ ОПТИМИЗАЦИЯ 2: Raycaster для проверки коллизий (создается один раз)
-    this.raycaster = new THREE.Raycaster();
-    this.raycaster.far = 0.3; // Ограничиваем дистанцию проверки
+    this.targetRotation = 0;
+    this.rotationSpeed = 0.1;
     
-    // ✅ ОПТИМИЗАЦИЯ 3: Флаг для контроля частоты проверок коллизий
-    this.collisionCheckCounter = 0;
-    this.collisionCheckInterval = 3; // Проверяем каждые 3 кадра вместо каждого
+    this.isActive = false;
     
-    // ✅ ОПТИМИЗАЦИЯ 4: Кэш для производительности
-    this.isModelLoaded = false;
-    this.hasPath = false;
+    this.applyRandomColor();
+  }
 
-    const loader = new GLTFLoader();
+  applyRandomColor() {
+    const hue = Math.random();
+    const color = new THREE.Color().setHSL(hue, 0.7, 0.5);
     
-    loader.load(modelConfig.url, (gltf) => {
-      this.mesh = gltf.scene;
-      this.isModelLoaded = true; // ✅ Флаг вместо постоянной проверки
-
-      // Применяем масштаб сразу после загрузки
-      this.updateScale();
-
-      // Включаем тени
-      this.mesh.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-          
-          // ✅ ОПТИМИЗАЦИЯ 5: Устанавливаем frustumCulled для оптимизации рендера
-          child.frustumCulled = true;
+    this.model.traverse(child => {
+      if (child.isMesh && child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach(mat => {
+            if (mat.color) {
+              mat.color.copy(color);
+            }
+          });
+        } else if (child.material.color) {
+          child.material.color.copy(color);
         }
-      });
-
-      this.scene.add(this.mesh);
-      
-      // Если маршрут уже был задан, ставим машину на старт
-      if (this.path) {
-        this.updatePosition(this.progress);
       }
-
-    }, undefined, (error) => {
-      console.error('Error loading car model:', error);
     });
   }
 
-  // Вызывается из TrafficManager при движении ползунка
-  setGlobalScale(multiplier) {
-    this.globalMultiplier = multiplier;
-    this.updateScale();
-  }
-
-  updateScale() {
-    // Проверка через флаг (быстрее чем !this.mesh)
-    if (this.isModelLoaded && this.mesh) {
-      const finalScale = this.baseScale * this.globalMultiplier;
-      this.mesh.scale.set(finalScale, finalScale, finalScale);
-    }
-  }
-
-  setRoute(routePoints) {
-    if (!routePoints || routePoints.length < 2) return;
-
-    // ✅ ОПТИМИЗАЦИЯ 6: Переиспользуем массив вместо создания нового каждый раз
-    const vectorPoints = [];
-    for (let i = 0; i < routePoints.length; i++) {
-      const p = routePoints[i];
-      vectorPoints.push(new THREE.Vector3(
-        p.x, 
-        0.005, // Чуть приподнимаем над дорогой
-        p.z
-      ));
-    }
-    
-    this.path = new THREE.CatmullRomCurve3(vectorPoints);
-    this.hasPath = true; // ✅ Флаг
-    this.progress = 0;
-    
-    // Пытаемся поставить на старт
-    this.updatePosition(0);
-  }
-
-  setPosition(x, y, z) {
-    if (this.isModelLoaded && this.mesh) {
-      this.mesh.position.set(x, y, z);
-    }
-  }
-
-  // ✅ ОПТИМИЗАЦИЯ 7: Метод для проверки коллизий (вызывается не каждый кадр)
-  checkCollisions(obstacles) {
-    if (!this.isModelLoaded || !this.mesh || !obstacles || obstacles.length === 0) {
+  spawn(startNode, endNode) {
+    if (!startNode || !endNode) {
+      console.error('Invalid spawn nodes');
       return false;
     }
-
-    // Направление движения
-    this._tempTangent.set(
-      Math.cos(this.mesh.rotation.y - Math.PI / 2),
-      0,
-      -Math.sin(this.mesh.rotation.y - Math.PI / 2)
-    ).normalize();
-
-    // Настраиваем raycaster
-    this.raycaster.set(this.mesh.position, this._tempTangent);
     
-    // Проверяем пересечения
-    const intersects = this.raycaster.intersectObjects(obstacles, true);
+    this.path = this.roadNetwork.findPath(startNode, endNode);
     
-    return intersects.length > 0;
+    if (this.path.length < 2) {
+      console.error('Path too short');
+      return false;
+    }
+    
+    this.currentPathIndex = 0;
+    this.progress = 0;
+    this.isActive = true;
+    
+    // ✅ Получаем полосу для первого сегмента
+    this.currentLane = this.roadNetwork.getLane(this.path[0], this.path[1]);
+    
+    // Устанавливаем начальную позицию (на правой полосе)
+    const start = this.path[0];
+    let startX = start.x;
+    let startY = start.y;
+    
+    if (this.currentLane) {
+      startX += this.currentLane.offset.x;
+      startY += this.currentLane.offset.y;
+    }
+    
+    this.model.position.set(startX, this.heightAboveRoad, startY);
+    
+    // Устанавливаем начальную ориентацию
+    if (this.path.length > 1) {
+      const next = this.path[1];
+      this.targetRotation = Math.atan2(next.y - start.y, next.x - start.x);
+      this.model.rotation.y = -this.targetRotation + Math.PI / 2;
+    }
+    
+    this.model.visible = true;
+    return true;
   }
 
-  update(deltaTime = 0.016) { // ✅ deltaTime для плавности
-    // Быстрая проверка через флаги
-    if (!this.isModelLoaded || !this.hasPath) return;
-
-    // ✅ ОПТИМИЗАЦИЯ 8: Используем deltaTime для независимости от FPS
-    const speedMultiplier = deltaTime * 60; // Нормализация к 60 FPS
-    this.progress += this.speed * speedMultiplier;
-
-    // Зацикливаем движение
-    if (this.progress > 1) {
+  update() {
+    if (!this.isActive || this.path.length < 2) return;
+    
+    const current = this.path[this.currentPathIndex];
+    const next = this.path[this.currentPathIndex + 1];
+    
+    if (!next) {
+      this.despawn();
+      return;
+    }
+    
+    // ✅ Обновляем текущую полосу
+    if (!this.currentLane || this.currentLane.start !== current || this.currentLane.end !== next) {
+      this.currentLane = this.roadNetwork.getLane(current, next);
+    }
+    
+    // Вычисляем базовые координаты (центр дороги)
+    const dx = next.x - current.x;
+    const dy = next.y - current.y;
+    const segmentLength = Math.hypot(dx, dy);
+    
+    // Вычисляем угол поворота на следующем сегменте
+    let turnAngle = 0;
+    if (this.currentPathIndex + 2 < this.path.length) {
+      const afterNext = this.path[this.currentPathIndex + 2];
+      const currentAngle = Math.atan2(dy, dx);
+      const nextAngle = Math.atan2(afterNext.y - next.y, afterNext.x - next.x);
+      turnAngle = Math.abs(nextAngle - currentAngle);
+      if (turnAngle > Math.PI) turnAngle = 2 * Math.PI - turnAngle;
+    }
+    
+    // Адаптивная скорость
+    const distanceToTurn = (1 - this.progress) * segmentLength;
+    const turnFactor = turnAngle > 0.5 ? 0.6 : 1.0;
+    const distanceFactor = distanceToTurn < 0.2 ? 0.7 : 1.0;
+    
+    this.currentSpeed = this.baseSpeed * turnFactor * distanceFactor;
+    
+    // Обновляем прогресс
+    this.progress += this.currentSpeed / segmentLength;
+    
+    if (this.progress >= 1) {
+      this.currentPathIndex++;
       this.progress = 0;
-    }
-
-    this.updatePosition(this.progress);
-    
-    // ✅ ОПТИМИЗАЦИЯ 9: Проверка коллизий не каждый кадр
-    this.collisionCheckCounter++;
-    if (this.collisionCheckCounter >= this.collisionCheckInterval) {
-      this.collisionCheckCounter = 0;
-      // Здесь можно вызвать checkCollisions, если передать массив препятствий
-      // const hasCollision = this.checkCollisions(obstacles);
-      // if (hasCollision) { /* обработка */ }
-    }
-  }
-
-  updatePosition(t) {
-    // Быстрая проверка через флаги
-    if (!this.isModelLoaded || !this.hasPath) return;
-
-    // ✅ ОПТИМИЗАЦИЯ 10: Используем переиспользуемые объекты
-    // Получаем точку на кривой в temp объект
-    this.path.getPointAt(t, this._tempPosition);
-    this.mesh.position.copy(this._tempPosition);
-
-    // Поворачиваем машину по направлению движения
-    this.path.getTangentAt(t, this._tempTangent).normalize();
-    
-    // ✅ ОПТИМИЗАЦИЯ 11: Используем Math.atan2 только когда нужно
-    const angle = Math.atan2(-this._tempTangent.z, this._tempTangent.x);
-    this.mesh.rotation.y = angle + Math.PI / 2;
-  }
-
-  // ✅ ОПТИМИЗАЦИЯ 12: Метод для очистки ресурсов
-  dispose() {
-    if (this.mesh) {
-      this.scene.remove(this.mesh);
       
-      // Очищаем геометрию и материалы
-      this.mesh.traverse((child) => {
-        if (child.isMesh) {
-          if (child.geometry) child.geometry.dispose();
-          if (child.material) {
-            if (Array.isArray(child.material)) {
-              child.material.forEach(m => m.dispose());
-            } else {
-              child.material.dispose();
-            }
-          }
-        }
-      });
-      
-      this.mesh = null;
+      if (this.currentPathIndex >= this.path.length - 1) {
+        this.despawn();
+        return;
+      }
     }
     
-    this.isModelLoaded = false;
-    this.hasPath = false;
-    this.path = null;
+    // ✅ Интерполяция позиции С УЧЕТОМ СМЕЩЕНИЯ ПОЛОСЫ
+    const smoothProgress = this.smoothstep(this.progress);
+    
+    // Базовая позиция (центр дороги)
+    let x = current.x + dx * smoothProgress;
+    let y = current.y + dy * smoothProgress;
+    
+    // Добавляем смещение полосы
+    if (this.currentLane) {
+      x += this.currentLane.offset.x;
+      y += this.currentLane.offset.y;
+    }
+    
+    this.model.position.set(x, this.heightAboveRoad, y);
+    
+    // Плавный поворот
+    this.targetRotation = Math.atan2(dy, dx);
+    let rotDiff = this.targetRotation - (this.model.rotation.y - Math.PI / 2);
+    
+    while (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
+    while (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
+    
+    this.model.rotation.y += rotDiff * this.rotationSpeed;
   }
-  
-  // ✅ ДОПОЛНИТЕЛЬНО: Метод для паузы/возобновления
-  setPaused(paused) {
-    this.isPaused = paused;
+
+  smoothstep(t) {
+    return t * t * (3 - 2 * t);
   }
-  
-  // ✅ ДОПОЛНИТЕЛЬНО: Метод для изменения скорости
-  setSpeed(speed) {
-    this.speed = speed;
+
+  despawn() {
+    this.isActive = false;
+    this.model.visible = false;
+    this.path = [];
+    this.currentPathIndex = 0;
+    this.progress = 0;
+    this.currentLane = null;
+  }
+
+  setGlobalScale(scale) {
+    const baseScale = getCarScale(this.modelName);
+    this.model.scale.setScalar(baseScale * scale);
+  }
+
+  isAvailable() {
+    return !this.isActive;
   }
 }

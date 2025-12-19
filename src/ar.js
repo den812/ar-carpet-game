@@ -1,8 +1,9 @@
 // ===================================
-// ФАЙЛ: src/ar.js V2
-// ДОБАВЛЕНО:
-// - Поддержка настроек (showStats)
-// - Улучшенная обработка ошибок
+// ФАЙЛ: src/ar.js V3
+// ИСПРАВЛЕНО:
+// - Проверка HTTPS перед запуском
+// - Лучшая обработка ошибок
+// - Информативные сообщения об ошибках
 // ===================================
 
 import * as THREE from 'three';
@@ -16,6 +17,35 @@ export const startAR = async (settings = {}) => {
   const showStats = settings.showStats !== false;
 
   try {
+    // ✅ Проверка HTTPS
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      const error = new Error('AR режим требует HTTPS для доступа к камере');
+      error.code = 'HTTPS_REQUIRED';
+      throw error;
+    }
+
+    // ✅ Проверка поддержки камеры
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      const error = new Error('Ваш браузер не поддерживает доступ к камере');
+      error.code = 'CAMERA_NOT_SUPPORTED';
+      throw error;
+    }
+
+    // ✅ Запрашиваем разрешение на камеру явно
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      // Останавливаем тестовый стрим
+      stream.getTracks().forEach(track => track.stop());
+      console.log('✅ Доступ к камере получен');
+    } catch (cameraError) {
+      console.error('❌ Ошибка доступа к камере:', cameraError);
+      const error = new Error('Нет доступа к камере. Разрешите доступ в настройках браузера.');
+      error.code = 'CAMERA_PERMISSION_DENIED';
+      throw error;
+    }
+
     const mindarThree = new MindARThree({
       container,
       imageTargetSrc: './assets/carpet.mind',
@@ -121,6 +151,26 @@ export const startAR = async (settings = {}) => {
 
   } catch (error) {
     console.error('❌ Ошибка запуска AR:', error);
-    throw error; // Пробрасываем ошибку для fallback в main.js
+    
+    // Формируем понятное сообщение об ошибке
+    let message = 'AR режим не запустился';
+    let suggestion = 'Попробуйте режим TOUCH';
+    
+    if (error.code === 'HTTPS_REQUIRED') {
+      message = '🔒 AR требует HTTPS';
+      suggestion = 'Откройте сайт через HTTPS или используйте режим TOUCH';
+    } else if (error.code === 'CAMERA_NOT_SUPPORTED') {
+      message = '📷 Камера не поддерживается';
+      suggestion = 'Используйте современный браузер (Chrome/Safari) или режим TOUCH';
+    } else if (error.code === 'CAMERA_PERMISSION_DENIED') {
+      message = '⛔ Нет доступа к камере';
+      suggestion = 'Разрешите доступ к камере в настройках браузера и перезагрузите страницу';
+    } else if (error.message && error.message.includes('target')) {
+      message = '🎯 Файл carpet.mind не найден';
+      suggestion = 'Проверьте что файл assets/carpet.mind существует';
+    }
+    
+    error.userMessage = `${message}\n\n${suggestion}`;
+    throw error;
   }
 };

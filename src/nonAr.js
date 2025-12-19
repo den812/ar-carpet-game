@@ -1,9 +1,6 @@
 // ===================================
-// ФАЙЛ: src/nonAr.js V11 FINAL
-// ДОБАВЛЕНО:
-// - Поддержка настроек (showStats, invertControls)
-// - Инверсия осей управления
-// - Исправлен GYRO (добавлен запрос разрешения)
+// ФАЙЛ: src/nonAr.js V12 FINAL
+// ИСПРАВЛЕНО: showRoads is not defined
 // ===================================
 
 import * as THREE from "three";
@@ -12,10 +9,20 @@ import { TrafficManager } from "./traffic/traffic_manager.js";
 import { StatsPanel } from "./ui/StatsPanel.js";
 
 export function startNonAR(mode, settings = {}) {
-  console.log(`🎮 Запуск режима: ${mode}`, settings);
+  console.log(`🎮 Запуск режима: ${mode}`);
+  console.log('📦 Полученные настройки:', settings);
 
+  // ✅ ИЗВЛЕКАЕМ ВСЕ НАСТРОЙКИ С ДЕФОЛТНЫМИ ЗНАЧЕНИЯМИ
   const showStats = settings.showStats !== false;
   const invertControls = settings.invertControls === true;
+  const showRoads = settings.showRoads === true;
+  
+  console.log('✅ Применяемые настройки:', { 
+    showStats, 
+    invertControls, 
+    showRoads 
+  });
+  
   const invertMultiplier = invertControls ? -1 : 1;
 
   const scene = new THREE.Scene();
@@ -92,8 +99,9 @@ export function startNonAR(mode, settings = {}) {
   const world = new THREE.Group();
   scene.add(world);
 
-  // Дороги и машины
-  const roadNetwork = createRoadNetwork(world);
+  // ✅ ДОРОГИ И МАШИНЫ (передаем showRoads)
+  console.log(`🛣️ Создание дорожной сети (showRoads: ${showRoads})`);
+  const roadNetwork = createRoadNetwork(world, { showRoads: showRoads });
   const trafficManager = new TrafficManager(world, roadNetwork);
 
   // ✅ Панель статистики (опционально)
@@ -230,15 +238,12 @@ export function startNonAR(mode, settings = {}) {
   if (mode === "GYRO") {
     console.log('📱 Инициализация GYRO управления');
     
-    // ✅ Проверяем поддержку DeviceOrientation
-    if (!window.DeviceOrientationEvent) {
-      console.error('❌ DeviceOrientationEvent не поддерживается');
-      alert('Ваше устройство не поддерживает гироскоп');
-    } else if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // ✅ iOS 13+ требует разрешение
+    if (typeof DeviceOrientationEvent !== 'undefined' && 
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
       // iOS 13+ требует разрешение
       console.log('📱 Запрос разрешения на GYRO (iOS 13+)');
       
-      // Создаем кнопку для запроса разрешения
       const permBtn = document.createElement('button');
       permBtn.textContent = '📱 Разрешить гироскоп';
       permBtn.style.cssText = `
@@ -279,17 +284,21 @@ export function startNonAR(mode, settings = {}) {
       
       document.body.appendChild(permBtn);
     } else {
-      // Android и старые iOS - разрешение не требуется
+      // Android и другие устройства - запускаем напрямую
+      console.log('📱 Запуск GYRO без запроса разрешения (Android/Desktop)');
       setupGyro();
     }
 
     function setupGyro() {
       let gyroActive = false;
+      let eventCount = 0;
       
       const handler = (e) => {
+        eventCount++;
+        
         if (e.beta !== null && e.gamma !== null) {
           if (!gyroActive) {
-            console.log('✅ GYRO активирован');
+            console.log('✅ GYRO активирован! beta=', e.beta, 'gamma=', e.gamma);
             gyroActive = true;
           }
           
@@ -301,18 +310,40 @@ export function startNonAR(mode, settings = {}) {
           phi = Math.max(0.2, Math.min(Math.PI - 0.2, phi));
 
           updateCamera();
+        } else {
+          if (eventCount % 60 === 1) {
+            console.warn('⚠️ GYRO событие получено, но beta/gamma = null');
+          }
         }
       };
       
-      window.addEventListener('deviceorientation', handler);
+      window.addEventListener('deviceorientation', handler, true);
+      console.log('✅ GYRO слушатель добавлен');
       
-      // Проверяем через 2 секунды что gyro работает
       setTimeout(() => {
-        if (!gyroActive) {
-          console.warn('⚠️ GYRO не активен через 2 секунды');
-          alert('Гироскоп не работает. Попробуйте наклонить устройство или проверьте настройки браузера.');
+        if (eventCount === 0) {
+          console.error('❌ GYRO события не получены за 3 секунды');
+          alert(
+            'Гироскоп не работает.\n\n' +
+            'Возможные причины:\n' +
+            '• Гироскоп отключен в настройках браузера\n' +
+            '• Требуется HTTPS (сейчас HTTP)\n' +
+            '• Устройство не имеет гироскопа\n\n' +
+            'Попробуйте:\n' +
+            '1. Включить датчики движения в Chrome (chrome://flags)\n' +
+            '2. Открыть сайт через HTTPS\n' +
+            '3. Использовать другой браузер'
+          );
+        } else if (!gyroActive) {
+          console.warn('⚠️ GYRO события получены, но данные некорректны');
+          alert(
+            'Гироскоп получает события, но данные некорректны.\n\n' +
+            'Попробуйте наклонить устройство или перезагрузить страницу.'
+          );
+        } else {
+          console.log(`✅ GYRO работает нормально (${eventCount} событий за 3 сек)`);
         }
-      }, 2000);
+      }, 3000);
     }
   }
 
@@ -348,5 +379,6 @@ export function startNonAR(mode, settings = {}) {
   console.log(`👆 Управление touch: АКТИВНО`);
   console.log(`🔄 Инверсия: ${invertControls ? 'ВКЛ' : 'ВЫКЛ'}`);
   console.log(`📊 Статистика: ${showStats ? 'ВКЛ' : 'ВЫКЛ'}`);
+  console.log(`🛣️ Визуализация дорог: ${showRoads ? 'ВКЛ (отладка)' : 'ВЫКЛ'}`);
   console.log(`📱 GYRO: ${mode === "GYRO" ? "АКТИВНО" : "ВЫКЛЮЧЕНО"}`);
 }
