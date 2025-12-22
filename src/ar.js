@@ -11,6 +11,7 @@ import { MindARThree } from 'mindar-image-three';
 import { createRoadNetwork } from './roads/road_system.js';
 import { TrafficManager } from './traffic/traffic_manager.js';
 import { StatsPanel } from './ui/StatsPanel.js';
+import { ControlPanel } from './ui/ControlPanel.js';
 
 export const startAR = async (settings = {}) => {
   const container = document.querySelector("#ar-container");
@@ -66,7 +67,7 @@ export const startAR = async (settings = {}) => {
     anchor.group.add(gameGroup);
 
     // Создаем дороги и машины
-    const roadNetwork = createRoadNetwork(gameGroup);
+    const roadNetwork = createRoadNetwork(gameGroup, { showRoads: settings.showRoads || false });
     const trafficManager = new TrafficManager(gameGroup, roadNetwork);
 
     // ✅ Панель статистики (опционально)
@@ -75,6 +76,10 @@ export const startAR = async (settings = {}) => {
       statsPanel = new StatsPanel();
       statsPanel.show();
     }
+
+    // ✅ Панель управления машинками (всегда)
+    const controlPanel = new ControlPanel(trafficManager);
+    controlPanel.show();
 
     // 🚗 Автоматический спавн машин
     trafficManager.spawnCars(5);

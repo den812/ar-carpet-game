@@ -96,6 +96,11 @@ export class RoadNetwork {
   }
 
   findPath(start, end, maxDepth = 20) {
+    // Если старт = конец, выбираем другой конец
+    if (start === end) {
+      end = this.nodes.find(n => n !== start) || start;
+    }
+    
     // A* поиск пути
     const openSet = [{ node: start, path: [start], cost: 0 }];
     const closedSet = new Set();
@@ -110,7 +115,10 @@ export class RoadNetwork {
       const current = openSet.shift();
       
       if (current.node === end) {
-        return current.path;
+        // ✅ Проверяем что путь достаточно длинный
+        if (current.path.length >= 2) {
+          return current.path;
+        }
       }
       
       closedSet.add(current.node);
@@ -138,8 +146,22 @@ export class RoadNetwork {
       }
     }
     
-    console.warn('Путь не найден, используем ближайший узел');
-    return [start, this.getClosestNode(end.x, end.y)];
+    // ✅ Путь не найден - создаем простой путь через соседние узлы
+    console.warn('⚠️ Путь не найден, создаем простой маршрут');
+    
+    if (start.connections.length > 0) {
+      const neighbor = start.connections[Math.floor(Math.random() * start.connections.length)];
+      return [start, neighbor];
+    }
+    
+    // Последняя попытка - берем любые два узла
+    const allNodes = this.nodes.filter(n => n !== start);
+    if (allNodes.length > 0) {
+      return [start, allNodes[0]];
+    }
+    
+    console.error('❌ Невозможно создать путь - нет связанных узлов');
+    return [start, start]; // Минимальный путь
   }
 
   heuristic(node, goal) {
@@ -180,7 +202,9 @@ export class RoadNetwork {
       nodes: this.nodes.length,
       roads: this.roads.length,
       lanes: this.lanes.length,
-      avgConnections: this.nodes.reduce((sum, n) => sum + n.connections.length, 0) / this.nodes.length
+      avgConnections: this.nodes.length > 0 
+        ? (this.nodes.reduce((sum, n) => sum + n.connections.length, 0) / this.nodes.length).toFixed(2)
+        : 0
     };
   }
 }

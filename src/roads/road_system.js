@@ -1,6 +1,6 @@
 // ===================================
-// ФАЙЛ: src/roads/road_system.js
-// НОВАЯ ВЕРСИЯ: Точная копия дорог с ковра
+// ФАЙЛ: src/roads/road_system.js V3
+// ВОССТАНОВЛЕНА правильная дорожная сеть как на ковре
 // ===================================
 
 import * as THREE from 'three';
@@ -9,7 +9,6 @@ import { RoadNetwork } from './roadNetwork.js';
 export function createRoadNetwork(parent, options = {}) {
   const network = new RoadNetwork();
   
-  // ✅ Опция показа дорог (по умолчанию скрыты)
   const showRoads = options.showRoads || false;
   
   // ============================================
@@ -17,7 +16,7 @@ export function createRoadNetwork(parent, options = {}) {
   // ============================================
   const carpetWidth = 2.0;
   const carpetHeight = 2.5;
-  const roadWidth = 0.08;
+  const roadWidth = 0.12;
   const laneWidth = roadWidth / 2;
   
   // Смещения от центра ковра
@@ -70,19 +69,12 @@ export function createRoadNetwork(parent, options = {}) {
   // ============================================
   
   const nodes = [
-    // Круговые развязки
     roundabout1, roundabout2, roundabout3, roundabout4,
-    // Центральные перекрестки
     center1, center2, center3, center4,
-    // Верхний край
     top1, top2, top3,
-    // Нижний край
     bottom1, bottom2, bottom3,
-    // Левый край
     left1, left2, left3,
-    // Правый край
     right1, right2, right3,
-    // Промежуточные
     mid1, mid2, mid3, mid4, mid5, mid6
   ];
   
@@ -147,7 +139,7 @@ export function createRoadNetwork(parent, options = {}) {
   network.addRoad(mid6, center4);
   network.addRoad(center4, right3);
   
-  // Диагональные соединения (как на ковре)
+  // Диагональные соединения
   network.addRoad(roundabout1, center1);
   network.addRoad(roundabout2, center2);
   network.addRoad(roundabout3, center3);
@@ -158,29 +150,32 @@ export function createRoadNetwork(parent, options = {}) {
   network.addRoad(center3, mid2);
   network.addRoad(center4, mid5);
   
+  console.log(`✅ Дорожная сеть создана:`);
+  console.log(`   - Узлов: ${network.nodes.length}`);
+  console.log(`   - Дорог: ${network.roads.length}`);
+  console.log(`   - Полос движения: ${network.lanes.length}`);
+  console.log(`   - Правостороннее движение: ДА`);
+  console.log(`   - Двустороннее движение: ДА`);
+  
+  // ✅ Проверяем связность узлов
+  const unconnected = network.nodes.filter(n => n.connections.length === 0);
+  if (unconnected.length > 0) {
+    console.warn(`⚠️ Найдено ${unconnected.length} несвязанных узлов!`);
+  } else {
+    console.log(`✅ Все узлы связаны`);
+  }
+  
   // ============================================
   // ВИЗУАЛИЗАЦИЯ ДОРОГ (опционально)
   // ============================================
   
   if (!showRoads) {
     console.log('⚠️ Визуализация дорог отключена (машины будут ездить по невидимым дорогам)');
-    console.log(`✅ Дорожная сеть создана:`);
-    console.log(`   - Узлов: ${network.nodes.length}`);
-    console.log(`   - Дорог: ${network.roads.length}`);
-    console.log(`   - Полос движения: ${network.lanes.length}`);
-    console.log(`   - Правостороннее движение: ДА`);
-    console.log(`   - Двустороннее движение: ДА`);
     return network;
   }
   
   console.log('🛣️ Визуализация дорог ВКЛЮЧЕНА (режим отладки)');
   
-  const roadMaterial = new THREE.LineBasicMaterial({ 
-    color: 0x333333, 
-    linewidth: 2 
-  });
-  
-  // ✅ Материал для разделительной линии (желтый пунктир) - КОНТРАСТНЫЙ
   const centerLineMaterial = new THREE.LineDashedMaterial({
     color: 0xffff00,
     linewidth: 3,
@@ -188,7 +183,6 @@ export function createRoadNetwork(parent, options = {}) {
     gapSize: 0.02
   });
   
-  // Материал для краевой линии (белый пунктир) - КОНТРАСТНЫЙ
   const edgeLineMaterial = new THREE.LineDashedMaterial({
     color: 0xffffff,
     linewidth: 2,
@@ -200,34 +194,31 @@ export function createRoadNetwork(parent, options = {}) {
     const start = road.start;
     const end = road.end;
     
-    // Создаем mesh дороги (серая полоса) - КОНТРАСТНАЯ
     const roadLength = Math.hypot(end.x - start.x, end.y - start.y);
     const roadGeometry = new THREE.PlaneGeometry(roadLength, roadWidth);
     const roadMesh = new THREE.Mesh(
       roadGeometry,
       new THREE.MeshStandardMaterial({ 
-        color: 0x333333, // темнее для контраста
+        color: 0x333333,
         roughness: 0.9,
-        emissive: 0x111111, // легкое свечение
+        emissive: 0x111111,
         emissiveIntensity: 0.2
       })
     );
     
-    // Позиционируем дорогу
     roadMesh.position.set(
       (start.x + end.x) / 2,
       0.001,
       (start.y + end.y) / 2
     );
     
-    // Поворачиваем дорогу
     const angle = Math.atan2(end.y - start.y, end.x - start.x);
     roadMesh.rotation.x = -Math.PI / 2;
     roadMesh.rotation.z = angle;
     
     parent.add(roadMesh);
     
-    // ✅ РАЗДЕЛИТЕЛЬНАЯ ЛИНИЯ ПО ЦЕНТРУ (желтый пунктир)
+    // Центральная линия
     const centerPoints = [
       new THREE.Vector3(start.x, 0.002, start.y),
       new THREE.Vector3(end.x, 0.002, end.y)
@@ -237,43 +228,37 @@ export function createRoadNetwork(parent, options = {}) {
     centerLine.computeLineDistances();
     parent.add(centerLine);
     
-    // ✅ КРАЕВЫЕ ЛИНИИ (белые пунктиры по бокам)
+    // Краевые линии
     const perpAngle = angle + Math.PI / 2;
     const edgeOffset = roadWidth / 2;
     const offsetX = Math.cos(perpAngle) * edgeOffset;
     const offsetY = Math.sin(perpAngle) * edgeOffset;
     
-    // Левая краевая линия
-    const leftEdgePoints = [
+    const leftPoints = [
       new THREE.Vector3(start.x + offsetX, 0.002, start.y + offsetY),
       new THREE.Vector3(end.x + offsetX, 0.002, end.y + offsetY)
     ];
-    const leftEdgeGeometry = new THREE.BufferGeometry().setFromPoints(leftEdgePoints);
-    const leftEdgeLine = new THREE.Line(leftEdgeGeometry, edgeLineMaterial);
-    leftEdgeLine.computeLineDistances();
-    parent.add(leftEdgeLine);
+    const leftGeometry = new THREE.BufferGeometry().setFromPoints(leftPoints);
+    const leftLine = new THREE.Line(leftGeometry, edgeLineMaterial);
+    leftLine.computeLineDistances();
+    parent.add(leftLine);
     
-    // Правая краевая линия
-    const rightEdgePoints = [
+    const rightPoints = [
       new THREE.Vector3(start.x - offsetX, 0.002, start.y - offsetY),
       new THREE.Vector3(end.x - offsetX, 0.002, end.y - offsetY)
     ];
-    const rightEdgeGeometry = new THREE.BufferGeometry().setFromPoints(rightEdgePoints);
-    const rightEdgeLine = new THREE.Line(rightEdgeGeometry, edgeLineMaterial);
-    rightEdgeLine.computeLineDistances();
-    parent.add(rightEdgeLine);
+    const rightGeometry = new THREE.BufferGeometry().setFromPoints(rightPoints);
+    const rightLine = new THREE.Line(rightGeometry, edgeLineMaterial);
+    rightLine.computeLineDistances();
+    parent.add(rightLine);
   });
   
-  // ============================================
-  // КРУГОВЫЕ РАЗВЯЗКИ (roundabouts)
-  // ============================================
-  
+  // Круговые развязки
   const roundabouts = [roundabout1, roundabout2, roundabout3, roundabout4];
   
   roundabouts.forEach(pos => {
     const radius = 0.15;
     
-    // Внешний круг (дорога) - КОНТРАСТНЫЙ
     const outerGeometry = new THREE.RingGeometry(radius - roadWidth/2, radius + roadWidth/2, 32);
     const outerMesh = new THREE.Mesh(
       outerGeometry,
@@ -289,7 +274,6 @@ export function createRoadNetwork(parent, options = {}) {
     outerMesh.position.set(pos.x, 0.001, pos.y);
     parent.add(outerMesh);
     
-    // Внутренний круг (газон)
     const innerGeometry = new THREE.CircleGeometry(radius - roadWidth/2, 32);
     const innerMesh = new THREE.Mesh(
       innerGeometry,
@@ -302,7 +286,6 @@ export function createRoadNetwork(parent, options = {}) {
     innerMesh.position.set(pos.x, 0.001, pos.y);
     parent.add(innerMesh);
     
-    // Разметка кругового движения (желтая)
     const circlePoints = [];
     for (let i = 0; i <= 64; i++) {
       const angle = (i / 64) * Math.PI * 2;
@@ -318,52 +301,7 @@ export function createRoadNetwork(parent, options = {}) {
     parent.add(circleLine);
   });
   
-  // ============================================
-  // ЗЕБРЫ НА ПЕРЕКРЕСТКАХ
-  // ============================================
-  
-  const crosswalks = [
-    // На центральных перекрестках
-    { pos: center1, angle: 0 },
-    { pos: center1, angle: Math.PI / 2 },
-    { pos: center2, angle: 0 },
-    { pos: center2, angle: Math.PI / 2 },
-    { pos: center3, angle: 0 },
-    { pos: center3, angle: Math.PI / 2 },
-    { pos: center4, angle: 0 },
-    { pos: center4, angle: Math.PI / 2 }
-  ];
-  
-  crosswalks.forEach(cw => {
-    const stripeWidth = 0.015;
-    const stripeLength = roadWidth * 1.2;
-    const stripeCount = 5;
-    const spacing = 0.012;
-    
-    for (let i = 0; i < stripeCount; i++) {
-      const offset = (i - (stripeCount - 1) / 2) * (stripeWidth + spacing);
-      const stripe = new THREE.Mesh(
-        new THREE.PlaneGeometry(stripeLength, stripeWidth),
-        new THREE.MeshStandardMaterial({ color: 0xffffff })
-      );
-      
-      stripe.rotation.x = -Math.PI / 2;
-      stripe.rotation.z = cw.angle;
-      
-      const dx = offset * Math.sin(cw.angle);
-      const dy = offset * Math.cos(cw.angle);
-      
-      stripe.position.set(cw.pos.x + dx, 0.002, cw.pos.y + dy);
-      parent.add(stripe);
-    }
-  });
-  
-  console.log(`✅ Дорожная сеть создана:`);
-  console.log(`   - Узлов: ${network.nodes.length}`);
-  console.log(`   - Дорог: ${network.roads.length}`);
-  console.log(`   - Полос движения: ${network.lanes.length}`);
-  console.log(`   - Правостороннее движение: ДА`);
-  console.log(`   - Двустороннее движение: ДА`);
+  console.log('✅ Дорожная сеть визуализирована');
   
   return network;
 }

@@ -61,16 +61,25 @@ export class Car {
 
   spawn(startNode, endNode) {
     if (!startNode || !endNode) {
-      console.error('Invalid spawn nodes');
+      console.error('❌ Invalid spawn nodes');
       return false;
     }
     
+    // ✅ Проверяем что узлы разные
+    if (startNode === endNode) {
+      console.error('❌ Start and end nodes are the same');
+      return false;
+    }
+    
+    // Находим путь
     this.path = this.roadNetwork.findPath(startNode, endNode);
     
     if (this.path.length < 2) {
-      console.error('Path too short');
+      console.error('❌ Path too short:', this.path.length);
       return false;
     }
+    
+    console.log(`✅ Path found: ${this.path.length} nodes`);
     
     this.currentPathIndex = 0;
     this.progress = 0;
@@ -89,7 +98,7 @@ export class Car {
       startY += this.currentLane.offset.y;
     }
     
-    this.model.position.set(startX, this.heightAboveRoad, startY);
+    this.model.position.set(startX, 0, startY); // ✅ Y = 0 (на уровне ковра)
     
     // Устанавливаем начальную ориентацию
     if (this.path.length > 1) {
@@ -166,7 +175,7 @@ export class Car {
       y += this.currentLane.offset.y;
     }
     
-    this.model.position.set(x, this.heightAboveRoad, y);
+    this.model.position.set(x, 0, y); // ✅ Y = 0 (на уровне ковра)
     
     // Плавный поворот
     this.targetRotation = Math.atan2(dy, dx);

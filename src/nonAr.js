@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { createRoadNetwork } from "./roads/road_system.js";
 import { TrafficManager } from "./traffic/traffic_manager.js";
 import { StatsPanel } from "./ui/StatsPanel.js";
+import { ControlPanel } from "./ui/ControlPanel.js";
 
 export function startNonAR(mode, settings = {}) {
   console.log(`🎮 Запуск режима: ${mode}`);
@@ -110,6 +111,10 @@ export function startNonAR(mode, settings = {}) {
     statsPanel = new StatsPanel();
     statsPanel.show();
   }
+
+  // ✅ Панель управления машинками (всегда)
+  const controlPanel = new ControlPanel(trafficManager);
+  controlPanel.show();
 
   // 🚗 Автоматический спавн машин
   trafficManager.spawnCars(7);
