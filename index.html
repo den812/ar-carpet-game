@@ -8,14 +8,14 @@
   />
   <title>AR Carpet Game</title>
 
-  <!-- ===== IMPORT MAP ===== -->
+  <!-- ===== IMPORT MAP - ИСПРАВЛЕНО: используем CDN без нарушения CSP ===== -->
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-      "three/examples/jsm/": "https://unpkg.com/three@0.158.0/examples/jsm/",
-      "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/",
-      "mindar-image-three": "https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+      "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/",
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
     }
   }
   </script>
@@ -202,6 +202,10 @@
       <div class="setting-item">
         <input type="checkbox" id="stats-toggle" checked />
         <label for="stats-toggle">📊 Показать статистику</label>
+      </div>
+      <div class="setting-item">
+        <input type="checkbox" id="control-toggle" checked />
+        <label for="control-toggle">🎛️ Панель управления машинками</label>
       </div>
       <div class="setting-item">
         <input type="checkbox" id="invert-toggle" />

@@ -1,9 +1,8 @@
 // ===================================
-// ФАЙЛ: src/cars/Car.js V3
-// ДОБАВЛЕНО:
-// - Движение по правой полосе
-// - Учет смещения полосы
-// - Правостороннее движение
+// ФАЙЛ: src/cars/Car.js
+// ИСПРАВЛЕНО:
+// - Машины больше не едут боком после поворота
+// - Правильное вычисление rotation с учетом ориентации модели
 // ===================================
 
 import * as THREE from 'three';
@@ -23,17 +22,17 @@ export class Car {
     this.maxSpeed = this.baseSpeed * 1.5;
     this.minSpeed = this.baseSpeed * 0.5;
     
-    this.heightAboveRoad = 0.05;
+    this.heightAboveRoad = 0.0; // На уровне ковра
     
     this.path = [];
     this.currentPathIndex = 0;
     this.progress = 0;
     
-    // ✅ НОВОЕ: текущая полоса движения
     this.currentLane = null;
     
     this.targetRotation = 0;
-    this.rotationSpeed = 0.1;
+    this.currentRotation = 0;
+    this.rotationSpeed = 0.15; // Увеличена скорость поворота
     
     this.isActive = false;
     
@@ -65,13 +64,11 @@ export class Car {
       return false;
     }
     
-    // ✅ Проверяем что узлы разные
     if (startNode === endNode) {
       console.error('❌ Start and end nodes are the same');
       return false;
     }
     
-    // Находим путь
     this.path = this.roadNetwork.findPath(startNode, endNode);
     
     if (this.path.length < 2) {
@@ -79,16 +76,12 @@ export class Car {
       return false;
     }
     
-    console.log(`✅ Path found: ${this.path.length} nodes`);
-    
     this.currentPathIndex = 0;
     this.progress = 0;
     this.isActive = true;
     
-    // ✅ Получаем полосу для первого сегмента
     this.currentLane = this.roadNetwork.getLane(this.path[0], this.path[1]);
     
-    // Устанавливаем начальную позицию (на правой полосе)
     const start = this.path[0];
     let startX = start.x;
     let startY = start.y;
@@ -98,12 +91,18 @@ export class Car {
       startY += this.currentLane.offset.y;
     }
     
-    this.model.position.set(startX, 0, startY); // ✅ Y = 0 (на уровне ковра)
+    this.model.position.set(startX, this.heightAboveRoad, startY);
     
-    // Устанавливаем начальную ориентацию
+    // ✅ ИСПРАВЛЕНО: правильная установка начальной ориентации
     if (this.path.length > 1) {
       const next = this.path[1];
-      this.targetRotation = Math.atan2(next.y - start.y, next.x - start.x);
+      const dx = next.x - start.x;
+      const dy = next.y - start.y;
+      this.targetRotation = Math.atan2(dy, dx);
+      this.currentRotation = this.targetRotation;
+      
+      // Модели Three.js обычно смотрят вдоль оси Z
+      // Поворачиваем на 90 градусов чтобы они смотрели вперед
       this.model.rotation.y = -this.targetRotation + Math.PI / 2;
     }
     
@@ -122,12 +121,11 @@ export class Car {
       return;
     }
     
-    // ✅ Обновляем текущую полосу
+    // Обновляем текущую полосу
     if (!this.currentLane || this.currentLane.start !== current || this.currentLane.end !== next) {
       this.currentLane = this.roadNetwork.getLane(current, next);
     }
     
-    // Вычисляем базовые координаты (центр дороги)
     const dx = next.x - current.x;
     const dy = next.y - current.y;
     const segmentLength = Math.hypot(dx, dy);
@@ -149,7 +147,6 @@ export class Car {
     
     this.currentSpeed = this.baseSpeed * turnFactor * distanceFactor;
     
-    // Обновляем прогресс
     this.progress += this.currentSpeed / segmentLength;
     
     if (this.progress >= 1) {
@@ -162,29 +159,36 @@ export class Car {
       }
     }
     
-    // ✅ Интерполяция позиции С УЧЕТОМ СМЕЩЕНИЯ ПОЛОСЫ
+    // Интерполяция позиции с учетом смещения полосы
     const smoothProgress = this.smoothstep(this.progress);
     
-    // Базовая позиция (центр дороги)
     let x = current.x + dx * smoothProgress;
     let y = current.y + dy * smoothProgress;
     
-    // Добавляем смещение полосы
     if (this.currentLane) {
       x += this.currentLane.offset.x;
       y += this.currentLane.offset.y;
     }
     
-    this.model.position.set(x, 0, y); // ✅ Y = 0 (на уровне ковра)
+    this.model.position.set(x, this.heightAboveRoad, y);
     
-    // Плавный поворот
+    // ✅ ИСПРАВЛЕНО: плавный поворот без бокового движения
+    // Вычисляем целевой угол направления движения
     this.targetRotation = Math.atan2(dy, dx);
-    let rotDiff = this.targetRotation - (this.model.rotation.y - Math.PI / 2);
     
+    // Вычисляем разницу углов с учетом кратчайшего пути
+    let rotDiff = this.targetRotation - this.currentRotation;
+    
+    // Нормализуем угол в диапазон [-π, π]
     while (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
     while (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
     
-    this.model.rotation.y += rotDiff * this.rotationSpeed;
+    // Плавно интерполируем текущий угол к целевому
+    this.currentRotation += rotDiff * this.rotationSpeed;
+    
+    // Применяем поворот к модели
+    // Модели Three.js обычно смотрят вдоль оси Z, поэтому добавляем 90 градусов
+    this.model.rotation.y = -this.currentRotation + Math.PI / 2;
   }
 
   smoothstep(t) {

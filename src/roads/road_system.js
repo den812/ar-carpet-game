@@ -1,6 +1,6 @@
 // ===================================
-// ФАЙЛ: src/roads/road_system.js V3
-// ВОССТАНОВЛЕНА правильная дорожная сеть как на ковре
+// ФАЙЛ: src/roads/road_system.js
+// ПОЛНАЯ ВЕРСИЯ БЕЗ ОБРЕЗОК
 // ===================================
 
 import * as THREE from 'three';
@@ -11,27 +11,19 @@ export function createRoadNetwork(parent, options = {}) {
   
   const showRoads = options.showRoads || false;
   
-  // ============================================
-  // ПАРАМЕТРЫ КОВРА И ДОРОГ
-  // ============================================
   const carpetWidth = 2.0;
   const carpetHeight = 2.5;
   const roadWidth = 0.12;
   const laneWidth = roadWidth / 2;
   
-  // Смещения от центра ковра
   const halfW = carpetWidth / 2;
   const halfH = carpetHeight / 2;
   
-  // ============================================
-  // УЗЛЫ ДОРОЖНОЙ СЕТИ (по координатам с ковра)
-  // ============================================
-  
   // Круговые развязки в углах
-  const roundabout1 = { x: -0.7, y: 0.9 };   // Верхний левый
-  const roundabout2 = { x: 0.7, y: 0.9 };    // Верхний правый
-  const roundabout3 = { x: -0.7, y: -0.9 };  // Нижний левый
-  const roundabout4 = { x: 0.7, y: -0.9 };   // Нижний правый
+  const roundabout1 = { x: -0.7, y: 0.9 };
+  const roundabout2 = { x: 0.7, y: 0.9 };
+  const roundabout3 = { x: -0.7, y: -0.9 };
+  const roundabout4 = { x: 0.7, y: -0.9 };
   
   // Центральные перекрестки
   const center1 = { x: -0.4, y: 0.3 };
@@ -39,7 +31,7 @@ export function createRoadNetwork(parent, options = {}) {
   const center3 = { x: -0.4, y: -0.3 };
   const center4 = { x: 0.4, y: -0.3 };
   
-  // Промежуточные узлы на главных дорогах
+  // Промежуточные узлы
   const top1 = { x: -0.4, y: 0.9 };
   const top2 = { x: 0, y: 0.9 };
   const top3 = { x: 0.4, y: 0.9 };
@@ -56,17 +48,12 @@ export function createRoadNetwork(parent, options = {}) {
   const right2 = { x: 0.9, y: 0 };
   const right3 = { x: 0.9, y: -0.5 };
   
-  // Дополнительные узлы для сложных маршрутов
   const mid1 = { x: -0.2, y: 0.6 };
   const mid2 = { x: 0.2, y: 0.6 };
   const mid3 = { x: -0.2, y: 0 };
   const mid4 = { x: 0.2, y: 0 };
   const mid5 = { x: -0.2, y: -0.6 };
   const mid6 = { x: 0.2, y: -0.6 };
-  
-  // ============================================
-  // ДОБАВЛЯЕМ УЗЛЫ В СЕТЬ
-  // ============================================
   
   const nodes = [
     roundabout1, roundabout2, roundabout3, roundabout4,
@@ -80,35 +67,31 @@ export function createRoadNetwork(parent, options = {}) {
   
   nodes.forEach(node => network.addNode(node.x, node.y));
   
-  // ============================================
-  // СОЕДИНЯЕМ УЗЛЫ ДОРОГАМИ
-  // ============================================
-  
-  // Периметр (верхний край)
+  // Периметр (верхний)
   network.addRoad(roundabout1, top1);
   network.addRoad(top1, top2);
   network.addRoad(top2, top3);
   network.addRoad(top3, roundabout2);
   
-  // Периметр (правый край)
+  // Периметр (правый)
   network.addRoad(roundabout2, right1);
   network.addRoad(right1, right2);
   network.addRoad(right2, right3);
   network.addRoad(right3, roundabout4);
   
-  // Периметр (нижний край)
+  // Периметр (нижний)
   network.addRoad(roundabout4, bottom3);
   network.addRoad(bottom3, bottom2);
   network.addRoad(bottom2, bottom1);
   network.addRoad(bottom1, roundabout3);
   
-  // Периметр (левый край)
+  // Периметр (левый)
   network.addRoad(roundabout3, left3);
   network.addRoad(left3, left2);
   network.addRoad(left2, left1);
   network.addRoad(left1, roundabout1);
   
-  // Внутренние вертикальные дороги
+  // Внутренние вертикальные
   network.addRoad(top1, center1);
   network.addRoad(center1, center3);
   network.addRoad(center3, bottom1);
@@ -122,7 +105,7 @@ export function createRoadNetwork(parent, options = {}) {
   network.addRoad(mid4, mid6);
   network.addRoad(mid6, bottom2);
   
-  // Внутренние горизонтальные дороги
+  // Внутренние горизонтальные
   network.addRoad(left1, center1);
   network.addRoad(center1, mid1);
   network.addRoad(mid1, mid2);
@@ -139,7 +122,7 @@ export function createRoadNetwork(parent, options = {}) {
   network.addRoad(mid6, center4);
   network.addRoad(center4, right3);
   
-  // Диагональные соединения
+  // Диагональные
   network.addRoad(roundabout1, center1);
   network.addRoad(roundabout2, center2);
   network.addRoad(roundabout3, center3);
@@ -154,10 +137,7 @@ export function createRoadNetwork(parent, options = {}) {
   console.log(`   - Узлов: ${network.nodes.length}`);
   console.log(`   - Дорог: ${network.roads.length}`);
   console.log(`   - Полос движения: ${network.lanes.length}`);
-  console.log(`   - Правостороннее движение: ДА`);
-  console.log(`   - Двустороннее движение: ДА`);
   
-  // ✅ Проверяем связность узлов
   const unconnected = network.nodes.filter(n => n.connections.length === 0);
   if (unconnected.length > 0) {
     console.warn(`⚠️ Найдено ${unconnected.length} несвязанных узлов!`);
@@ -165,16 +145,11 @@ export function createRoadNetwork(parent, options = {}) {
     console.log(`✅ Все узлы связаны`);
   }
   
-  // ============================================
-  // ВИЗУАЛИЗАЦИЯ ДОРОГ (опционально)
-  // ============================================
-  
   if (!showRoads) {
-    console.log('⚠️ Визуализация дорог отключена (машины будут ездить по невидимым дорогам)');
     return network;
   }
   
-  console.log('🛣️ Визуализация дорог ВКЛЮЧЕНА (режим отладки)');
+  console.log('🛣️ Визуализация дорог ВКЛЮЧЕНА');
   
   const centerLineMaterial = new THREE.LineDashedMaterial({
     color: 0xffff00,

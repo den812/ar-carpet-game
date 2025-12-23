@@ -1,15 +1,18 @@
 // ===================================
 // ФАЙЛ: src/config.js
-// ВОССТАНОВЛЕНЫ правильные масштабы машин
+// ИСПРАВЛЕНЫ масштабы моделей согласно требованиям:
+// - Buggy: 0.3x (было 0.8)
+// - Milk Truck: 8.5x (было 1.0)
+// - Duck: 10x (было 1.2)
 // ===================================
 
 export const CONFIG = {
   carScales: {
-    defaultScale: 0.002, // ✅ УВЕЛИЧЕН! (было 0.0008)
+    defaultScale: 0.002, // Базовый масштаб
     models: {
-      "Buggy.glb": 0.8,
-      "Duck.glb": 1.2,
-      "CesiumMilkTruck.glb": 1.0
+      "Buggy.glb": 0.3,      // ✅ ИСПРАВЛЕНО: 0.3x (было 0.8)
+      "Duck.glb": 10.0,       // ✅ ИСПРАВЛЕНО: 10x (было 1.2)
+      "CesiumMilkTruck.glb": 8.5  // ✅ ИСПРАВЛЕНО: 8.5x (было 1.0)
     }
   },
   carpet: { 
@@ -27,7 +30,7 @@ export const CONFIG = {
     count: 7, 
     baseSpeed: 0.0005, 
     speedVariation: 0.0003, 
-    heightAboveCarpet: 0.0 // ✅ НОЛЬ! На уровне ковра!
+    heightAboveCarpet: 0.0 // На уровне ковра
   },
   lighting: { 
     ambient: { 

@@ -1,8 +1,8 @@
 // ===================================
 // ФАЙЛ: src/traffic/traffic_manager.js
 // ИСПРАВЛЕНО: 
-// - car.setPosition НЕ СУЩЕСТВУЕТ
-// - Убраны все вызовы несуществующих методов
+// - Правильная логика спавна конкретной модели
+// - Улучшена работа с пулом машин
 // ===================================
 
 import { Car } from '../cars/Car.js';
@@ -71,31 +71,26 @@ export class TrafficManager {
   }
 
   async spawnCarWithModel(modelData) {
-    let car = null;
-    
-    // Пытаемся взять из пула
-    if (this.carPool.length > 0) {
-      car = this.carPool.pop();
-      console.log('♻️ Машина взята из пула');
-    } else {
-      // Создаем новую машину
-      const modelData = this.carModels.getRandomModel();
-      if (!modelData) {
-        console.error('❌ Не удалось получить модель машины');
-        return null;
-      }
-      
-      car = new Car(modelData.model, this.roadNetwork, modelData.name);
-      this.cars.push(car);
-      this.parent.add(car.model);
-      
-      console.log(`🆕 Создана новая машина: ${modelData.name}`);
+    if (!modelData || !modelData.model) {
+      console.error('❌ Невалидные данные модели:', modelData);
+      return null;
     }
+
+    console.log(`🚗 Спавн машины: ${modelData.name}`);
+
+    // ✅ ИСПРАВЛЕНО: всегда создаем НОВУЮ машину с переданной моделью
+    // Не берем из пула, т.к. пул может содержать машины других моделей
+    
+    const car = new Car(modelData.model, this.roadNetwork, modelData.name);
+    this.cars.push(car);
+    this.parent.add(car.model);
+    
+    console.log(`🆕 Создана новая машина: ${modelData.name}`);
     
     // Применяем глобальный масштаб
     car.setGlobalScale(this.globalScaleMultiplier);
     
-    // ✅ Выбираем случайные узлы для маршрута (гарантируем что они разные)
+    // Выбираем случайные узлы для маршрута
     const startNode = this.roadNetwork.getRandomNode();
     let endNode = this.roadNetwork.getRandomNode();
     
@@ -108,7 +103,9 @@ export class TrafficManager {
     
     if (endNode === startNode) {
       console.error('❌ Не удалось найти разные узлы для маршрута');
-      this.carPool.push(car);
+      // Удаляем машину из сцены
+      this.parent.remove(car.model);
+      this.cars = this.cars.filter(c => c !== car);
       return null;
     }
     
@@ -116,11 +113,13 @@ export class TrafficManager {
     const success = car.spawn(startNode, endNode);
     
     if (!success) {
-      console.warn('⚠️ Не удалось заспавнить машину, возвращаем в пул');
-      this.carPool.push(car);
+      console.warn('⚠️ Не удалось заспавнить машину');
+      this.parent.remove(car.model);
+      this.cars = this.cars.filter(c => c !== car);
       return null;
     }
     
+    console.log(`✅ Машина ${modelData.name} успешно заспавнена`);
     return car;
   }
 
@@ -132,13 +131,14 @@ export class TrafficManager {
       if (car.isActive) {
         car.update();
         
-        // Если машина завершила путь, возвращаем в пул и спавним новую
+        // Если машина завершила путь, спавним новую
         if (!car.isActive) {
-          this.carPool.push(car);
-          
-          // Спавним новую машину с задержкой
+          // Спавним новую машину той же модели с задержкой
           setTimeout(() => {
-            this.spawnSingleCar();
+            const modelData = this.carModels.getModelByName(car.modelName);
+            if (modelData) {
+              this.spawnCarWithModel(modelData);
+            }
           }, Math.random() * 2000 + 500);
         }
       }
@@ -158,12 +158,11 @@ export class TrafficManager {
 
   getStats() {
     const activeCars = this.cars.filter(c => c.isActive).length;
-    const pooledCars = this.carPool.length;
     
     return {
       totalCars: this.cars.length,
       activeCars: activeCars,
-      pooledCars: pooledCars
+      pooledCars: 0 // Больше не используем пул
     };
   }
 
