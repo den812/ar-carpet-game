@@ -319,7 +319,7 @@ export const startAR = async (settings = {}) => {
     };
     
     document.getElementById('rotate-left').onclick = () => {
-      carpetRotation -= Math.PI / 12; // -15 градусов
+      carpetRotation -= Math.PI / 60; // ✅ ИСПРАВЛЕНО: -3 градуса (было -15)
       carpetGroup.rotation.y = carpetRotation;
       const degrees = Math.round(carpetRotation * 180 / Math.PI);
       document.getElementById('rotation-display').textContent = degrees;
@@ -327,7 +327,7 @@ export const startAR = async (settings = {}) => {
     };
     
     document.getElementById('rotate-right').onclick = () => {
-      carpetRotation += Math.PI / 12; // +15 градусов
+      carpetRotation += Math.PI / 60; // ✅ ИСПРАВЛЕНО: +3 градуса (было +15)
       carpetGroup.rotation.y = carpetRotation;
       const degrees = Math.round(carpetRotation * 180 / Math.PI);
       document.getElementById('rotation-display').textContent = degrees;
@@ -400,6 +400,17 @@ export const startAR = async (settings = {}) => {
       hitTestSource = null;
       placeButton.style.display = 'none';
       instructionText.style.display = 'none';
+      calibrationPanel.style.display = 'none';
+      
+      // ✅ ИСПРАВЛЕНО: Возврат на стартовую страницу
+      if (renderer && renderer.domElement && renderer.domElement.parentNode) {
+        renderer.domElement.parentNode.removeChild(renderer.domElement);
+      }
+      
+      // Перезагрузка страницы для возврата на старт
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     }
     
     // ===================================
@@ -411,23 +422,27 @@ export const startAR = async (settings = {}) => {
       domOverlay: { root: document.body }
     });
     
-    arButton.textContent = '🚀 ЗАПУСТИТЬ AR';
+    arButton.textContent = '🚀 AR';
     arButton.style.cssText = `
       position: fixed;
       bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 20px 40px;
-      font-size: 20px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      padding: 0;
+      font-size: 24px;
       font-weight: bold;
       background: linear-gradient(135deg, #ff00ff 0%, #cc00cc 100%);
       color: #fff;
       border: 3px solid #ff00ff;
-      border-radius: 15px;
+      border-radius: 50%;
       cursor: pointer;
       z-index: 3000;
-      box-shadow: 0 0 30px rgba(255, 0, 255, 0.8);
+      box-shadow: 0 0 20px rgba(255, 0, 255, 0.8);
       pointer-events: all;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     `;
     document.body.appendChild(arButton);
     

@@ -126,21 +126,43 @@ export class TrafficManager {
   update() {
     if (!this.isInitialized) return;
     
-    // Обновляем все активные машины
-    for (const car of this.cars) {
-      if (car.isActive) {
-        car.update();
+    const activeCars = this.cars.filter(c => c.isActive);
+    
+    // ✅ НОВОЕ: Проверка коллизий между машинами
+    for (let i = 0; i < activeCars.length; i++) {
+      const car1 = activeCars[i];
+      let hasCollision = false;
+      
+      for (let j = i + 1; j < activeCars.length; j++) {
+        const car2 = activeCars[j];
         
-        // Если машина завершила путь, спавним новую
-        if (!car.isActive) {
-          // Спавним новую машину той же модели с задержкой
-          setTimeout(() => {
-            const modelData = this.carModels.getModelByName(car.modelName);
-            if (modelData) {
-              this.spawnCarWithModel(modelData);
-            }
-          }, Math.random() * 2000 + 500);
+        if (car1.checkCollision(car2)) {
+          hasCollision = true;
+          
+          // Останавливаем обе машины
+          car1.stopForCollision();
+          car2.stopForCollision();
         }
+      }
+      
+      // Если нет коллизий, возобновляем движение
+      if (!hasCollision) {
+        car1.resumeMovement();
+      }
+    }
+    
+    // Обновляем все активные машины
+    for (const car of activeCars) {
+      car.update();
+      
+      // Если машина завершила путь, спавним новую
+      if (!car.isActive) {
+        setTimeout(() => {
+          const modelData = this.carModels.getModelByName(car.modelName);
+          if (modelData) {
+            this.spawnCarWithModel(modelData);
+          }
+        }, Math.random() * 2000 + 500);
       }
     }
   }
