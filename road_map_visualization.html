@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Проверка карты дорог V3 FINAL</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #000;
+      font-family: monospace;
+      color: #0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 { text-shadow: 0 0 10px #0f0; }
+    .controls {
+      background: rgba(0,0,0,0.9);
+      padding: 15px;
+      border: 2px solid #0f0;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    button, label {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #0f0, #0c0);
+      color: #000;
+      border: 2px solid #0f0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    input[type="file"] { display: none; }
+    input[type="range"] { width: 150px; }
+    #canvas { border: 3px solid #0f0; border-radius: 10px; max-width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>🗺️ ПРОВЕРКА КАРТЫ V3 FINAL</h1>
+  
+  <div class="controls">
+    <label for="upload">📁 ЗАГРУЗИТЬ КОВЕР</label>
+    <input type="file" id="upload" accept="image/*">
+    
+    <label>Прозрачность: <span id="op">0.8</span>
+      <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.8">
+    </label>
+    
+    <label>Ширина: <span id="w">10</span>px
+      <input type="range" id="width" min="2" max="20" value="10">
+    </label>
+    
+    <button id="nodes">Узлы</button>
+    <button id="roundabouts">Развязки</button>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let img = null, showNodes = false, showRound = true, opacity = 0.8, width = 10;
+
+    // ТОЧНЫЕ КООРДИНАТЫ V3
+    const roads = {
+      roundabouts: [
+        { x: -0.72, y: 0.75, r: 0.10 },
+        { x: -0.74, y: 0.0, r: 0.10 },
+        { x: -0.72, y: -0.75, r: 0.10 }
+      ],
+      
+      paths: [
+        // Развязка 1
+        [{x:-0.72,y:0.85},{x:-0.64,y:0.82},{x:-0.62,y:0.75},{x:-0.64,y:0.68},{x:-0.72,y:0.65},{x:-0.80,y:0.68},{x:-0.82,y:0.75},{x:-0.80,y:0.82},{x:-0.72,y:0.85}],
+        
+        // Развязка 2
+        [{x:-0.74,y:0.10},{x:-0.66,y:0.07},{x:-0.64,y:0.0},{x:-0.66,y:-0.07},{x:-0.74,y:-0.10},{x:-0.82,y:-0.07},{x:-0.84,y:0.0},{x:-0.82,y:0.07},{x:-0.74,y:0.10}],
+        
+        // Развязка 3
+        [{x:-0.72,y:-0.65},{x:-0.64,y:-0.68},{x:-0.62,y:-0.75},{x:-0.64,y:-0.82},{x:-0.72,y:-0.85},{x:-0.80,y:-0.82},{x:-0.82,y:-0.75},{x:-0.80,y:-0.68},{x:-0.72,y:-0.65}],
+        
+        // Верх
+        [{x:-0.64,y:0.82},{x:-0.55,y:0.88},{x:-0.38,y:0.92},{x:-0.20,y:0.95},{x:0.0,y:0.96},{x:0.20,y:0.94},{x:0.38,y:0.88},{x:0.52,y:0.80},{x:0.62,y:0.68}],
+        
+        // Право
+        [{x:0.62,y:0.68},{x:0.68,y:0.55},{x:0.70,y:0.40},{x:0.68,y:0.25},{x:0.70,y:0.10},{x:0.68,y:-0.05},{x:0.70,y:-0.20},{x:0.68,y:-0.35},{x:0.70,y:-0.50},{x:0.66,y:-0.65},{x:0.58,y:-0.75}],
+        
+        // Низ
+        [{x:0.58,y:-0.75},{x:0.45,y:-0.82},{x:0.30,y:-0.88},{x:0.12,y:-0.92},{x:-0.08,y:-0.94},{x:-0.26,y:-0.92},{x:-0.42,y:-0.86},{x:-0.55,y:-0.78},{x:-0.64,y:-0.68}],
+        
+        // Лево верх
+        [{x:-0.82,y:0.75},{x:-0.88,y:0.62},{x:-0.90,y:0.48},{x:-0.89,y:0.32},{x:-0.87,y:0.18},{x:-0.82,y:0.07}],
+        
+        // Лево низ
+        [{x:-0.82,y:-0.07},{x:-0.87,y:-0.18},{x:-0.89,y:-0.32},{x:-0.90,y:-0.48},{x:-0.88,y:-0.62},{x:-0.82,y:-0.75}],
+        
+        // Внутренние
+        [{x:-0.62,y:0.75},{x:-0.50,y:0.70},{x:-0.35,y:0.68},{x:-0.20,y:0.64},{x:-0.05,y:0.58},{x:0.10,y:0.52},{x:0.22,y:0.46}],
+        [{x:0.22,y:0.46},{x:0.35,y:0.40},{x:0.48,y:0.34},{x:0.58,y:0.28}],
+        [{x:-0.72,y:0.65},{x:-0.68,y:0.52},{x:-0.62,y:0.38},{x:-0.54,y:0.24},{x:-0.44,y:0.12}],
+        [{x:-0.64,y:0.0},{x:-0.52,y:0.02},{x:-0.38,y:0.04},{x:-0.24,y:0.02},{x:-0.10,y:0.0},{x:0.05,y:-0.02},{x:0.20,y:-0.06},{x:0.34,y:-0.12},{x:0.46,y:-0.18}],
+        [{x:-0.72,y:-0.65},{x:-0.68,y:-0.52},{x:-0.62,y:-0.38},{x:-0.54,y:-0.24},{x:-0.44,y:-0.12}],
+        [{x:-0.62,y:-0.75},{x:-0.50,y:-0.70},{x:-0.35,y:-0.68},{x:-0.20,y:-0.64},{x:-0.05,y:-0.58},{x:0.10,y:-0.52},{x:0.22,y:-0.46}],
+        [{x:0.22,y:-0.46},{x:0.35,y:-0.40},{x:0.48,y:-0.38},{x:0.58,y:-0.42}],
+        
+        // Вертикальные
+        [{x:-0.44,y:0.12},{x:-0.42,y:0.0},{x:-0.44,y:-0.12}],
+        [{x:-0.10,y:0.30},{x:-0.08,y:0.15},{x:-0.10,y:0.0},{x:-0.08,y:-0.15},{x:-0.10,y:-0.30}],
+        [{x:0.15,y:0.25},{x:0.12,y:0.10},{x:0.15,y:-0.05},{x:0.12,y:-0.20},{x:0.15,y:-0.35}]
+      ]
+    };
+
+    function norm(x, y, w, h) {
+      return {
+        x: ((x + 1.0) / 2.0) * w,
+        y: ((1.2 - y) / 2.4) * h
+      };
+    }
+
+    function draw() {
+      if (!img || !img.complete) {
+        canvas.width = 800;
+        canvas.height = 1000;
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#0f0';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('ЗАГРУЗИТЕ КОВЕР', 400, 500);
+        return;
+      }
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      const w = canvas.width, h = canvas.height;
+
+      ctx.globalAlpha = opacity;
+      ctx.strokeStyle = '#f00';
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      roads.paths.forEach(path => {
+        ctx.beginPath();
+        path.forEach((p, i) => {
+          const pos = norm(p.x, p.y, w, h);
+          i === 0 ? ctx.moveTo(pos.x, pos.y) : ctx.lineTo(pos.x, pos.y);
+        });
+        ctx.stroke();
+      });
+
+      if (showRound) {
+        roads.roundabouts.forEach(rb => {
+          const c = norm(rb.x, rb.y, w, h);
+          const r = rb.r * (w / 2);
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+          ctx.strokeStyle = '#ff0';
+          ctx.lineWidth = width;
+          ctx.stroke();
+          
+          ctx.fillStyle = '#0ff';
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      if (showNodes) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#0f0';
+        const allNodes = roads.paths.flat();
+        allNodes.forEach(n => {
+          const pos = norm(n.x, n.y, w, h);
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      ctx.globalAlpha = 1;
+    }
+
+    document.getElementById('upload').onchange = e => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          img = new Image();
+          img.onload = draw;
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    document.getElementById('opacity').oninput = e => {
+      opacity = parseFloat(e.target.value);
+      document.getElementById('op').textContent = opacity.toFixed(1);
+      draw();
+    };
+
+    document.getElementById('width').oninput = e => {
+      width = parseInt(e.target.value);
+      document.getElementById('w').textContent = width;
+      draw();
+    };
+
+    document.getElementById('nodes').onclick = () => {
+      showNodes = !showNodes;
+      draw();
+    };
+
+    document.getElementById('roundabouts').onclick = () => {
+      showRound = !showRound;
+      draw();
+    };
+
+    draw();
+  </script>
+</body>
+</html>

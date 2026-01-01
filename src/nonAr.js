@@ -1,6 +1,6 @@
 // ===================================
-// ФАЙЛ: src/nonAr.js
-// Без изменений - работает корректно
+// ФАЙЛ: src/nonAr.js V2 - БЕЗ ЗАВИСАНИЙ
+// Простой запуск без проверок
 // ===================================
 
 import * as THREE from "three";
@@ -10,24 +10,22 @@ import { StatsPanel } from "./ui/StatsPanel.js";
 import { ControlPanel } from "./ui/ControlPanel.js";
 
 export function startNonAR(mode, settings = {}) {
-  console.log(`🎮 Запуск режима: ${mode}`);
+  console.log(`🎮 ${mode}...`);
 
   const showStats = settings.showStats !== false;
-  const showControl = settings.showControl !== false; // ✅ НОВОЕ
+  const showControl = settings.showControl !== false;
   const invertControls = settings.invertControls === true;
   const showRoads = settings.showRoads === true;
   
-  const invertMultiplier = invertControls ? -1 : 1;
+  const inv = invertControls ? -1 : 1;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87CEEB);
 
   const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
-  let radius = 2.5;
-  let theta = 0.5;
-  let phi = 1.1;
+  let radius = 2.5, theta = 0.5, phi = 1.1;
 
-  function updateCamera() {
+  function updateCam() {
     camera.position.set(
       radius * Math.sin(phi) * Math.sin(theta),
       radius * Math.cos(phi),
@@ -35,11 +33,11 @@ export function startNonAR(mode, settings = {}) {
     );
     camera.lookAt(0, 0, 0);
   }
-  updateCamera();
+  updateCam();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(devicePixelRatio);
   document.body.appendChild(renderer.domElement);
   renderer.domElement.style.cursor = 'grab';
 
@@ -48,39 +46,23 @@ export function startNonAR(mode, settings = {}) {
   dl.position.set(5, 10, 5);
   scene.add(dl);
 
-  const textureLoader = new THREE.TextureLoader();
-  textureLoader.load(
+  new THREE.TextureLoader().load(
     './assets/carpet-scan.jpg',
-    (texture) => {
-      console.log('✅ Текстура ковра загружена');
-      
-      const carpetGeometry = new THREE.PlaneGeometry(2.0, 2.5);
-      const carpetMaterial = new THREE.MeshStandardMaterial({
-        map: texture,
-        side: THREE.DoubleSide
-      });
-      
-      const carpet = new THREE.Mesh(carpetGeometry, carpetMaterial);
+    tex => {
+      const carpet = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.0, 2.5),
+        new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide })
+      );
       carpet.rotation.x = -Math.PI / 2;
-      carpet.position.y = 0;
-      carpet.receiveShadow = true;
-      
       scene.add(carpet);
     },
     undefined,
-    (error) => {
-      console.error('❌ Ошибка загрузки текстуры ковра:', error);
-      
-      const carpetGeometry = new THREE.PlaneGeometry(2.0, 2.5);
-      const carpetMaterial = new THREE.MeshStandardMaterial({
-        color: 0x888888,
-        side: THREE.DoubleSide
-      });
-      
-      const carpet = new THREE.Mesh(carpetGeometry, carpetMaterial);
+    () => {
+      const carpet = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.0, 2.5),
+        new THREE.MeshStandardMaterial({ color: 0x888888, side: THREE.DoubleSide })
+      );
       carpet.rotation.x = -Math.PI / 2;
-      carpet.position.y = 0;
-      carpet.receiveShadow = true;
       scene.add(carpet);
     }
   );
@@ -88,7 +70,7 @@ export function startNonAR(mode, settings = {}) {
   const world = new THREE.Group();
   scene.add(world);
 
-  const roadNetwork = createRoadNetwork(world, { showRoads: showRoads });
+  const roadNetwork = createRoadNetwork(world, { showRoads });
   const trafficManager = new TrafficManager(world, roadNetwork);
 
   let statsPanel = null;
@@ -97,207 +79,149 @@ export function startNonAR(mode, settings = {}) {
     statsPanel.show();
   }
 
-  // ✅ Панель управления машинками (опционально)
   let controlPanel = null;
   if (showControl) {
     controlPanel = new ControlPanel(trafficManager);
     controlPanel.show();
   }
 
-  trafficManager.spawnCars(7);
-  trafficManager.setGlobalScale(1.0);
+  // Запуск машин
+  trafficManager.init().then(() => {
+    trafficManager.spawnCars(7);
+    trafficManager.setGlobalScale(1.0);
+  });
 
-  let dragging = false;
-  let prev = { x: 0, y: 0 };
+  // Мышь
+  let drag = false, prev = { x: 0, y: 0 };
 
-  renderer.domElement.addEventListener('mousedown', e => {
-    dragging = true;
+  renderer.domElement.onmousedown = e => {
+    drag = true;
     prev = { x: e.clientX, y: e.clientY };
     renderer.domElement.style.cursor = 'grabbing';
-  });
+  };
 
-  window.addEventListener('mouseup', () => {
-    if (dragging) {
-      dragging = false;
+  window.onmouseup = () => {
+    if (drag) {
+      drag = false;
       renderer.domElement.style.cursor = 'grab';
     }
-  });
+  };
 
-  window.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    
-    const deltaX = e.clientX - prev.x;
-    const deltaY = e.clientY - prev.y;
-    
-    theta -= deltaX * 0.005 * invertMultiplier;
-    phi += deltaY * 0.005 * invertMultiplier;
+  window.onmousemove = e => {
+    if (!drag) return;
+    const dx = e.clientX - prev.x;
+    const dy = e.clientY - prev.y;
+    theta -= dx * 0.005 * inv;
+    phi += dy * 0.005 * inv;
     phi = Math.max(0.2, Math.min(Math.PI - 0.2, phi));
-    
     prev = { x: e.clientX, y: e.clientY };
-    updateCamera();
-  });
+    updateCam();
+  };
 
-  renderer.domElement.addEventListener('wheel', e => {
+  renderer.domElement.onwheel = e => {
     e.preventDefault();
-    
-    const delta = e.deltaY * 0.002;
-    radius += delta;
+    radius += e.deltaY * 0.002;
     radius = Math.max(1.0, Math.min(6.0, radius));
-    
-    updateCamera();
-  }, { passive: false });
+    updateCam();
+  };
 
-  let isSingleTouch = false;
-  let isPinching = false;
-  let lastTouchX = 0;
-  let lastTouchY = 0;
-  let lastTouchDist = null;
+  // Тач
+  let single = false, pinch = false, lastX = 0, lastY = 0, lastDist = null;
 
-  renderer.domElement.addEventListener('touchstart', e => {
+  renderer.domElement.ontouchstart = e => {
     if (e.touches.length === 1) {
-      isSingleTouch = true;
-      isPinching = false;
-      lastTouchX = e.touches[0].clientX;
-      lastTouchY = e.touches[0].clientY;
-      lastTouchDist = null;
+      single = true;
+      pinch = false;
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
+      lastDist = null;
     } else if (e.touches.length === 2) {
-      isSingleTouch = false;
-      isPinching = true;
+      single = false;
+      pinch = true;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
-      lastTouchDist = Math.hypot(dx, dy);
+      lastDist = Math.hypot(dx, dy);
     }
-  }, { passive: true });
+  };
 
-  renderer.domElement.addEventListener('touchmove', e => {
-    if (isSingleTouch && e.touches.length === 1) {
-      const deltaX = e.touches[0].clientX - lastTouchX;
-      const deltaY = e.touches[0].clientY - lastTouchY;
-
-      theta -= deltaX * 0.005 * invertMultiplier;
-      phi += deltaY * 0.005 * invertMultiplier;
+  renderer.domElement.ontouchmove = e => {
+    if (single && e.touches.length === 1) {
+      const dx = e.touches[0].clientX - lastX;
+      const dy = e.touches[0].clientY - lastY;
+      theta -= dx * 0.005 * inv;
+      phi += dy * 0.005 * inv;
       phi = Math.max(0.2, Math.min(Math.PI - 0.2, phi));
-
-      lastTouchX = e.touches[0].clientX;
-      lastTouchY = e.touches[0].clientY;
-      updateCamera();
-    } else if (isPinching && e.touches.length === 2 && lastTouchDist !== null) {
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
+      updateCam();
+    } else if (pinch && e.touches.length === 2 && lastDist) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const currentDist = Math.hypot(dx, dy);
-
-      const delta = (currentDist - lastTouchDist) * 0.01;
+      const dist = Math.hypot(dx, dy);
+      const delta = (dist - lastDist) * 0.01;
       radius = Math.max(1.0, Math.min(6.0, radius - delta));
-
-      lastTouchDist = currentDist;
-      updateCamera();
+      lastDist = dist;
+      updateCam();
     }
-  }, { passive: true });
+  };
 
-  renderer.domElement.addEventListener('touchend', e => {
+  renderer.domElement.ontouchend = e => {
     if (e.touches.length === 0) {
-      isSingleTouch = false;
-      isPinching = false;
-      lastTouchDist = null;
+      single = false;
+      pinch = false;
+      lastDist = null;
     } else if (e.touches.length === 1) {
-      isSingleTouch = true;
-      isPinching = false;
-      lastTouchDist = null;
-      lastTouchX = e.touches[0].clientX;
-      lastTouchY = e.touches[0].clientY;
+      single = true;
+      pinch = false;
+      lastDist = null;
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
     }
-  }, { passive: true });
+  };
 
+  // GYRO
   if (mode === "GYRO") {
     if (typeof DeviceOrientationEvent !== 'undefined' && 
         typeof DeviceOrientationEvent.requestPermission === 'function') {
       
-      const permBtn = document.createElement('button');
-      permBtn.textContent = '📱 Разрешить гироскоп';
-      permBtn.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 3000;
-        padding: 20px 30px;
-        font-size: 18px;
-        font-weight: bold;
-        background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
-        color: #000;
-        border: 3px solid #00ff00;
-        border-radius: 12px;
-        cursor: pointer;
-        box-shadow: 0 4px 15px rgba(0, 255, 0, 0.6);
-      `;
+      const btn = document.createElement('button');
+      btn.textContent = '📱 Разрешить гироскоп';
+      btn.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3000;padding:20px 30px;font-size:18px;font-weight:bold;background:linear-gradient(135deg,#0f0,#0c0);color:#000;border:3px solid #0f0;border-radius:12px;cursor:pointer;box-shadow:0 4px 15px rgba(0,255,0,0.6);`;
       
-      permBtn.onclick = async () => {
+      btn.onclick = async () => {
         try {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission === 'granted') {
-            console.log('✅ GYRO разрешение получено');
-            permBtn.remove();
+          const perm = await DeviceOrientationEvent.requestPermission();
+          if (perm === 'granted') {
+            btn.remove();
             setupGyro();
-          } else {
-            alert('Разрешение на гироскоп отклонено');
-            permBtn.remove();
           }
-        } catch (err) {
-          alert('Ошибка запроса разрешения: ' + err.message);
-          permBtn.remove();
-        }
+        } catch {}
       };
       
-      document.body.appendChild(permBtn);
+      document.body.appendChild(btn);
     } else {
       setupGyro();
     }
 
     function setupGyro() {
-      let gyroActive = false;
-      let eventCount = 0;
-      
-      const handler = (e) => {
-        eventCount++;
-        
+      window.addEventListener('deviceorientation', e => {
         if (e.beta !== null && e.gamma !== null) {
-          if (!gyroActive) {
-            console.log('✅ GYRO активирован!');
-            gyroActive = true;
-          }
-          
           const beta = THREE.MathUtils.degToRad(e.beta);
           const gamma = THREE.MathUtils.degToRad(e.gamma);
-
           theta = gamma * 2;
           phi = Math.PI / 2 - beta;
           phi = Math.max(0.2, Math.min(Math.PI - 0.2, phi));
-
-          updateCamera();
+          updateCam();
         }
-      };
-      
-      window.addEventListener('deviceorientation', handler, true);
-      
-      setTimeout(() => {
-        if (eventCount === 0) {
-          alert(
-            'Гироскоп не работает.\n\n' +
-            'Попробуйте:\n' +
-            '1. Включить датчики движения в Chrome\n' +
-            '2. Открыть сайт через HTTPS\n' +
-            '3. Использовать другой браузер'
-          );
-        }
-      }, 3000);
+      });
     }
   }
 
-  window.addEventListener('resize', () => {
+  window.onresize = () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
-  });
+  };
 
   renderer.setAnimationLoop(() => {
     trafficManager.update();
@@ -305,7 +229,7 @@ export function startNonAR(mode, settings = {}) {
     if (statsPanel) {
       const stats = trafficManager.getStats();
       statsPanel.update({
-        mode: mode,
+        mode,
         tracking: false,
         paused: false,
         cars: stats.activeCars,
@@ -317,6 +241,4 @@ export function startNonAR(mode, settings = {}) {
     
     renderer.render(scene, camera);
   });
-
-  console.log(`✅ Режим ${mode} запущен успешно`);
 }

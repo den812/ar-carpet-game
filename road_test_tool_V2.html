@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛠️ Редактор карты дорог</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a1a;
+      font-family: 'Courier New', monospace;
+      color: #0f0;
+      padding: 10px;
+      overflow: hidden;
+    }
+    .container {
+      display: flex;
+      gap: 10px;
+      height: calc(100vh - 20px);
+    }
+    .left-panel {
+      width: 300px;
+      background: rgba(0,0,0,0.95);
+      border: 2px solid #0f0;
+      border-radius: 8px;
+      padding: 10px;
+      overflow-y: auto;
+    }
+    .canvas-wrapper {
+      flex: 1;
+      position: relative;
+      border: 3px solid #0f0;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+    h1 {
+      text-align: center;
+      font-size: 16px;
+      margin-bottom: 10px;
+      color: #0ff;
+    }
+    .section {
+      background: rgba(0,255,0,0.05);
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #0f0;
+    }
+    .section h3 {
+      margin-bottom: 8px;
+      color: #ff0;
+      font-size: 12px;
+    }
+    button, label.btn {
+      padding: 8px 12px;
+      background: linear-gradient(135deg, #0f0, #0c0);
+      color: #000;
+      border: 2px solid #0f0;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 11px;
+      width: 100%;
+      margin-bottom: 5px;
+      display: block;
+      text-align: center;
+    }
+    button:hover { transform: scale(1.02); }
+    input[type="file"] { display: none; }
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      margin-bottom: 5px;
+    }
+    .mode-btn {
+      padding: 10px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 2px solid #666;
+      background: rgba(0,0,0,0.5);
+      color: #0f0;
+    }
+    .mode-btn.active {
+      background: linear-gradient(135deg, #0f0, #0c0);
+      color: #000;
+      border-color: #0f0;
+    }
+    .info {
+      background: #000;
+      padding: 8px;
+      border-radius: 5px;
+      font-size: 10px;
+      margin-bottom: 8px;
+    }
+    .slider-group {
+      margin-bottom: 8px;
+    }
+    .slider-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      margin-bottom: 3px;
+    }
+    .value { color: #ff0; }
+    input[type="range"] {
+      width: 100%;
+      height: 20px;
+    }
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 5px;
+      font-size: 11px;
+    }
+    .checkbox input {
+      width: 16px;
+      height: 16px;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      background: #000;
+      color: #0f0;
+      border: 1px solid #0f0;
+      border-radius: 5px;
+      padding: 5px;
+      font-family: monospace;
+      font-size: 10px;
+      resize: vertical;
+    }
+    .node-list {
+      max-height: 150px;
+      overflow-y: auto;
+      background: #000;
+      padding: 5px;
+      border-radius: 5px;
+      font-size: 9px;
+    }
+    .node-item {
+      padding: 3px;
+      cursor: pointer;
+      border-bottom: 1px solid #333;
+    }
+    .node-item:hover {
+      background: rgba(0,255,0,0.1);
+    }
+    .node-item.selected {
+      background: rgba(255,255,0,0.3);
+      color: #ff0;
+    }
+    .help-text {
+      font-size: 9px;
+      color: #888;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="left-panel">
+      <h1>🛠️ РЕДАКТОР ДОРОГ</h1>
+      
+      <!-- РЕЖИМ -->
+      <div class="section">
+        <h3>🎯 РЕЖИМ</h3>
+        <div class="btn-group">
+          <button class="mode-btn active" data-mode="view">👁️ Просмотр</button>
+          <button class="mode-btn" data-mode="add">➕ Узел</button>
+          <button class="mode-btn" data-mode="road">🛣️ Дорога</button>
+          <button class="mode-btn" data-mode="roundabout">⭕ Развязка</button>
+          <button class="mode-btn" data-mode="delete">❌ Удалить</button>
+          <button class="mode-btn" data-mode="move">↔️ Двигать</button>
+        </div>
+        <div class="help-text" id="mode-help">
+          Просмотр: перетаскивайте карту
+        </div>
+      </div>
+
+      <!-- ЗАГРУЗКА -->
+      <div class="section">
+        <h3>📁 ЗАГРУЗКА</h3>
+        <label for="carpet" class="btn">📷 Ковер</label>
+        <input type="file" id="carpet" accept="image/*">
+        <label for="roads" class="btn" style="background: linear-gradient(135deg, #f0f, #c0c); border-color: #f0f;">
+          🗺️ road_system.js
+        </label>
+        <input type="file" id="roads" accept=".js">
+        <div class="info" id="status">Нет данных</div>
+      </div>
+
+      <!-- УЗЛЫ -->
+      <div class="section">
+        <h3>📍 УЗЛЫ (<span id="node-count">0</span>)</h3>
+        <div class="node-list" id="node-list"></div>
+        <button id="clear-nodes" style="background: linear-gradient(135deg, #f00, #c00); border-color: #f00;">
+          🗑️ Очистить все
+        </button>
+      </div>
+
+      <!-- РАЗВЯЗКИ -->
+      <div class="section">
+        <h3>⭕ РАЗВЯЗКИ (<span id="roundabout-count">0</span>)</h3>
+        <div class="info" id="roundabout-list">Нет развязок</div>
+        <button id="mark-roundabout">⭕ Отметить выделенные как развязку</button>
+      </div>
+
+      <!-- ВИЗУАЛИЗАЦИЯ -->
+      <div class="section">
+        <h3>🎨 ОТОБРАЖЕНИЕ</h3>
+        <div class="slider-group">
+          <label><span>Прозрачность:</span><span class="value" id="op-val">0.7</span></label>
+          <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.7">
+        </div>
+        <div class="slider-group">
+          <label><span>Ширина:</span><span class="value" id="w-val">5</span></label>
+          <input type="range" id="width" min="2" max="15" value="5">
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="show-nodes" checked>
+          <label for="show-nodes">Узлы</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="show-roads" checked>
+          <label for="show-roads">Дороги</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="show-roundabouts" checked>
+          <label for="show-roundabouts">Развязки</label>
+        </div>
+      </div>
+
+      <!-- ЭКСПОРТ -->
+      <div class="section">
+        <h3>💾 ЭКСПОРТ</h3>
+        <button id="export">📋 Копировать код</button>
+        <textarea id="export-area" placeholder="Здесь появится код..."></textarea>
+      </div>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let img = null;
+    let nodes = [];
+    let roads = [];
+    let roundabouts = [];
+    let selectedNodes = [];
+    
+    let mode = 'view';
+    let opacity = 0.7, lineWidth = 5;
+    let showNodes = true, showRoads = true, showRoundabouts = true;
+    
+    let dragStart = null;
+    let offsetX = 0, offsetY = 0;
+    let scale = 1.0;
+    
+    const modeHelp = {
+      view: 'Просмотр: перетаскивайте карту, колесо = зум',
+      add: 'Узел: кликайте чтобы добавить узлы',
+      road: 'Дорога: кликайте на 2 узла чтобы соединить',
+      roundabout: 'Развязка: кликайте узлы по кругу, Enter = замкнуть',
+      delete: 'Удалить: кликайте на узлы/дороги для удаления',
+      move: 'Двигать: перетаскивайте узлы'
+    };
+    
+    let tempRoundabout = [];
+
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      draw();
+    }
+    
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function toCanvas(x, y) {
+      const cx = ((parseFloat(x) + 1.0) / 2.0) * 1000;
+      const cy = ((1.2 - parseFloat(y)) / 2.4) * 1200;
+      return {
+        x: cx * scale + offsetX,
+        y: cy * scale + offsetY
+      };
+    }
+
+    function fromCanvas(cx, cy) {
+      const nx = (cx - offsetX) / scale;
+      const ny = (cy - offsetY) / scale;
+      const x = (nx / 1000) * 2.0 - 1.0;
+      const y = 1.2 - (ny / 1200) * 2.4;
+      return { x: x.toFixed(2), y: y.toFixed(2) };
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#222';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      
+      if (img && img.complete) {
+        const w = 1000 * scale;
+        const h = 1200 * scale;
+        ctx.drawImage(img, offsetX, offsetY, w, h);
+      }
+
+      // Дороги
+      if (showRoads && roads.length > 0) {
+        ctx.globalAlpha = opacity;
+        ctx.strokeStyle = '#f00';
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        
+        roads.forEach(road => {
+          const p1 = toCanvas(road.from.x, road.from.y);
+          const p2 = toCanvas(road.to.x, road.to.y);
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        });
+        ctx.globalAlpha = 1;
+      }
+
+      // Развязки
+      if (showRoundabouts && roundabouts.length > 0) {
+        ctx.strokeStyle = '#ff0';
+        ctx.lineWidth = lineWidth;
+        roundabouts.forEach(rb => {
+          ctx.beginPath();
+          rb.forEach((node, i) => {
+            const p = toCanvas(node.x, node.y);
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          });
+          ctx.closePath();
+          ctx.stroke();
+          
+          // Центр
+          if (rb.length > 0) {
+            const center = rb[Math.floor(rb.length / 2)];
+            const p = toCanvas(center.x, center.y);
+            ctx.fillStyle = '#0ff';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+      }
+
+      // Временная развязка
+      if (tempRoundabout.length > 0) {
+        ctx.strokeStyle = '#0f0';
+        ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        tempRoundabout.forEach((node, i) => {
+          const p = toCanvas(node.x, node.y);
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+      }
+
+      // Узлы
+      if (showNodes) {
+        nodes.forEach((node, i) => {
+          const p = toCanvas(node.x, node.y);
+          const isSelected = selectedNodes.includes(i);
+          
+          ctx.fillStyle = isSelected ? '#ff0' : '#0f0';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, isSelected ? 6 : 4, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Номер
+          ctx.fillStyle = '#fff';
+          ctx.font = '10px monospace';
+          ctx.fillText(i, p.x + 8, p.y - 8);
+        });
+      }
+
+      ctx.restore();
+      updateUI();
+    }
+
+    function updateUI() {
+      document.getElementById('node-count').textContent = nodes.length;
+      document.getElementById('roundabout-count').textContent = roundabouts.length;
+      
+      const nodeList = document.getElementById('node-list');
+      nodeList.innerHTML = nodes.map((n, i) => 
+        `<div class="node-item ${selectedNodes.includes(i) ? 'selected' : ''}" data-idx="${i}">
+          ${i}: (${n.x}, ${n.y})
+        </div>`
+      ).join('');
+      
+      document.getElementById('roundabout-list').textContent = 
+        roundabouts.length > 0 ? 
+        roundabouts.map((r, i) => `Развязка ${i + 1}: ${r.length} узлов`).join(', ') :
+        'Нет развязок';
+    }
+
+    function findNodeAt(cx, cy) {
+      const threshold = 10;
+      for (let i = 0; i < nodes.length; i++) {
+        const p = toCanvas(nodes[i].x, nodes[i].y);
+        const dist = Math.hypot(p.x - cx, p.y - cy);
+        if (dist < threshold) return i;
+      }
+      return -1;
+    }
+
+    // События
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        mode = btn.dataset.mode;
+        document.getElementById('mode-help').textContent = modeHelp[mode];
+        selectedNodes = [];
+        tempRoundabout = [];
+        draw();
+      };
+    });
+
+    canvas.onmousedown = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      
+      if (mode === 'view') {
+        dragStart = { x: cx - offsetX, y: cy - offsetY };
+      } else if (mode === 'add') {
+        const coords = fromCanvas(cx, cy);
+        nodes.push(coords);
+        draw();
+      } else if (mode === 'road') {
+        const idx = findNodeAt(cx, cy);
+        if (idx >= 0) {
+          if (selectedNodes.length === 0) {
+            selectedNodes.push(idx);
+          } else if (selectedNodes.length === 1) {
+            roads.push({ from: nodes[selectedNodes[0]], to: nodes[idx] });
+            selectedNodes = [];
+          }
+          draw();
+        }
+      } else if (mode === 'roundabout') {
+        const idx = findNodeAt(cx, cy);
+        if (idx >= 0 && !tempRoundabout.includes(nodes[idx])) {
+          tempRoundabout.push(nodes[idx]);
+          draw();
+        }
+      } else if (mode === 'delete') {
+        const idx = findNodeAt(cx, cy);
+        if (idx >= 0) {
+          nodes.splice(idx, 1);
+          roads = roads.filter(r => r.from !== nodes[idx] && r.to !== nodes[idx]);
+          draw();
+        }
+      }
+    };
+
+    canvas.onmousemove = (e) => {
+      if (mode === 'view' && dragStart) {
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        offsetX = cx - dragStart.x;
+        offsetY = cy - dragStart.y;
+        draw();
+      }
+    };
+
+    canvas.onmouseup = () => {
+      dragStart = null;
+    };
+
+    canvas.onwheel = (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      scale = Math.max(0.1, Math.min(5, scale * delta));
+      draw();
+    };
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && mode === 'roundabout' && tempRoundabout.length >= 3) {
+        roundabouts.push([...tempRoundabout]);
+        tempRoundabout = [];
+        draw();
+      }
+    });
+
+    document.getElementById('carpet').onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          img = new Image();
+          img.onload = () => {
+            document.getElementById('status').textContent = '✅ Ковер загружен';
+            draw();
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    document.getElementById('roads').onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const code = ev.target.result;
+            // Простой парсинг массивов узлов
+            const matches = code.matchAll(/\{\s*x:\s*([-\d.]+),\s*y:\s*([-\d.]+)\s*\}/g);
+            nodes = [];
+            for (const match of matches) {
+              nodes.push({ x: match[1], y: match[2] });
+            }
+            document.getElementById('status').textContent = `✅ Загружено ${nodes.length} узлов`;
+            draw();
+          } catch (err) {
+            alert('Ошибка парсинга: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      }
+    };
+
+    document.getElementById('node-list').onclick = (e) => {
+      const item = e.target.closest('.node-item');
+      if (item) {
+        const idx = parseInt(item.dataset.idx);
+        if (selectedNodes.includes(idx)) {
+          selectedNodes = selectedNodes.filter(i => i !== idx);
+        } else {
+          selectedNodes.push(idx);
+        }
+        draw();
+      }
+    };
+
+    document.getElementById('mark-roundabout').onclick = () => {
+      if (selectedNodes.length >= 3) {
+        const rb = selectedNodes.map(i => nodes[i]);
+        roundabouts.push(rb);
+        selectedNodes = [];
+        draw();
+      } else {
+        alert('Выберите минимум 3 узла');
+      }
+    };
+
+    document.getElementById('clear-nodes').onclick = () => {
+      if (confirm('Удалить все узлы и дороги?')) {
+        nodes = [];
+        roads = [];
+        roundabouts = [];
+        selectedNodes = [];
+        draw();
+      }
+    };
+
+    document.getElementById('opacity').oninput = (e) => {
+      opacity = parseFloat(e.target.value);
+      document.getElementById('op-val').textContent = opacity.toFixed(1);
+      draw();
+    };
+
+    document.getElementById('width').oninput = (e) => {
+      lineWidth = parseInt(e.target.value);
+      document.getElementById('w-val').textContent = lineWidth;
+      draw();
+    };
+
+    document.getElementById('show-nodes').onchange = (e) => {
+      showNodes = e.target.checked;
+      draw();
+    };
+
+    document.getElementById('show-roads').onchange = (e) => {
+      showRoads = e.target.checked;
+      draw();
+    };
+
+    document.getElementById('show-roundabouts').onchange = (e) => {
+      showRoundabouts = e.target.checked;
+      draw();
+    };
+
+    document.getElementById('export').onclick = () => {
+      const code = `// road_system.js - Экспорт из редактора
+// Узлов: ${nodes.length}, Дорог: ${roads.length}, Развязок: ${roundabouts.length}
+
+const allNodes = [
+${nodes.map(n => `  { x: ${n.x}, y: ${n.y} }`).join(',\n')}
+];
+
+const roads = [
+${roads.map(r => {
+  const fromIdx = nodes.indexOf(r.from);
+  const toIdx = nodes.indexOf(r.to);
+  return `  { from: ${fromIdx}, to: ${toIdx} }`;
+}).join(',\n')}
+];
+
+const roundabouts = [
+${roundabouts.map(rb => {
+  const indices = rb.map(n => nodes.indexOf(n));
+  return `  [${indices.join(', ')}]`;
+}).join(',\n')}
+];`;
+      
+      document.getElementById('export-area').value = code;
+      navigator.clipboard.writeText(code);
+      alert('✅ Код скопирован в буфер!');
+    };
+
+    draw();
+  </script>
+</body>
+</html>

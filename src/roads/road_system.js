@@ -1,7 +1,6 @@
 // ===================================
 // ФАЙЛ: src/roads/road_system.js
-// СТРУКТУРА ПО РЕАЛЬНОМУ КОВРУ
-// Органическая форма с круговыми развязками
+// ИСПРАВЛЕНО: ДОБАВЛЕНЫ ВСЕ СИНИЕ СОЕДИНЕНИЯ
 // ===================================
 
 import * as THREE from 'three';
@@ -11,269 +10,188 @@ export function createRoadNetwork(parent, options = {}) {
   const network = new RoadNetwork();
   
   const showRoads = options.showRoads || false;
-  
   const roadWidth = 0.08;
   
-  // ============================================
-  // УЗЛЫ ДОРОЖНОЙ СЕТИ (по реальному ковру)
-  // Органическая структура с изгибами
-  // ============================================
+  console.log('🛣️ Создание полной карты дорог...');
   
-  // КРУГОВАЯ РАЗВЯЗКА 1 (верхняя левая)
-  const roundabout1 = { x: -0.6, y: 0.85 };
-  
-  // КРУГОВАЯ РАЗВЯЗКА 2 (средняя левая)
-  const roundabout2 = { x: -0.65, y: 0.0 };
-  
-  // КРУГОВАЯ РАЗВЯЗКА 3 (нижняя левая)
-  const roundabout3 = { x: -0.6, y: -0.85 };
-  
-  // ВЕРХНЯЯ ЧАСТЬ (волнистая дорога)
-  const t1 = { x: -0.9, y: 1.1 };
-  const t2 = { x: -0.6, y: 1.15 };
-  const t3 = { x: -0.2, y: 1.1 };
-  const t4 = { x: 0.2, y: 1.15 };
-  const t5 = { x: 0.6, y: 1.1 };
-  const t6 = { x: 0.9, y: 1.15 };
-  
-  // ПРАВАЯ ЧАСТЬ (волнистая дорога)
-  const r1 = { x: 1.0, y: 0.9 };
-  const r2 = { x: 0.95, y: 0.5 };
-  const r3 = { x: 1.0, y: 0.1 };
-  const r4 = { x: 0.95, y: -0.3 };
-  const r5 = { x: 1.0, y: -0.7 };
-  const r6 = { x: 0.95, y: -1.1 };
-  
-  // НИЖНЯЯ ЧАСТЬ (волнистая дорога)
-  const b1 = { x: 0.6, y: -1.15 };
-  const b2 = { x: 0.2, y: -1.1 };
-  const b3 = { x: -0.2, y: -1.15 };
-  const b4 = { x: -0.6, y: -1.1 };
-  const b5 = { x: -0.9, y: -1.15 };
-  
-  // ЛЕВАЯ ЧАСТЬ (волнистая дорога)
-  const l1 = { x: -0.95, y: -1.0 };
-  const l2 = { x: -1.0, y: -0.5 };
-  const l3 = { x: -0.95, y: 0.0 };
-  const l4 = { x: -1.0, y: 0.5 };
-  const l5 = { x: -0.95, y: 1.0 };
-  
-  // ВНУТРЕННИЕ ДОРОГИ (изогнутые)
-  // Верхний центральный квартал
-  const c1 = { x: -0.3, y: 0.6 };
-  const c2 = { x: 0.0, y: 0.65 };
-  const c3 = { x: 0.3, y: 0.6 };
-  
-  // Центральный квартал
-  const c4 = { x: -0.3, y: 0.2 };
-  const c5 = { x: 0.0, y: 0.15 };
-  const c6 = { x: 0.3, y: 0.2 };
-  
-  const c7 = { x: -0.3, y: -0.2 };
-  const c8 = { x: 0.0, y: -0.15 };
-  const c9 = { x: 0.3, y: -0.2 };
-  
-  // Нижний центральный квартал
-  const c10 = { x: -0.3, y: -0.6 };
-  const c11 = { x: 0.0, y: -0.65 };
-  const c12 = { x: 0.3, y: -0.6 };
-  
-  // Соединительные узлы с круговыми развязками
-  const conn1 = { x: -0.45, y: 0.85 };
-  const conn2 = { x: -0.75, y: 0.85 };
-  const conn3 = { x: -0.6, y: 1.0 };
-  const conn4 = { x: -0.6, y: 0.7 };
-  
-  const conn5 = { x: -0.5, y: 0.0 };
-  const conn6 = { x: -0.8, y: 0.0 };
-  const conn7 = { x: -0.65, y: 0.3 };
-  const conn8 = { x: -0.65, y: -0.3 };
-  
-  const conn9 = { x: -0.45, y: -0.85 };
-  const conn10 = { x: -0.75, y: -0.85 };
-  const conn11 = { x: -0.6, y: -0.7 };
-  const conn12 = { x: -0.6, y: -1.0 };
-  
-  // Правые соединения
-  const r_conn1 = { x: 0.6, y: 0.6 };
-  const r_conn2 = { x: 0.6, y: 0.2 };
-  const r_conn3 = { x: 0.6, y: -0.2 };
-  const r_conn4 = { x: 0.6, y: -0.6 };
-  
-  // ============================================
-  // ДОБАВЛЯЕМ УЗЛЫ В СЕТЬ
-  // ============================================
-  
+  // ВСЕ 228 ТОЧЕК
   const allNodes = [
-    roundabout1, roundabout2, roundabout3,
-    t1, t2, t3, t4, t5, t6,
-    r1, r2, r3, r4, r5, r6,
-    b1, b2, b3, b4, b5,
-    l1, l2, l3, l4, l5,
-    c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12,
-    conn1, conn2, conn3, conn4,
-    conn5, conn6, conn7, conn8,
-    conn9, conn10, conn11, conn12,
-    r_conn1, r_conn2, r_conn3, r_conn4
+    { x: -0.88, y: 1.11 }, { x: -0.98, y: 1.11 }, { x: -0.98, y: 1.05 }, { x: -0.98, y: 1.00 },
+    { x: -0.91, y: 1.01 }, { x: -0.83, y: 1.01 }, { x: -0.78, y: 0.99 }, { x: -0.74, y: 0.98 },
+    { x: -0.69, y: 0.95 }, { x: -0.65, y: 0.95 }, { x: -0.62, y: 0.93 }, { x: -0.60, y: 0.89 },
+    { x: -0.57, y: 0.87 }, { x: -0.52, y: 0.85 }, { x: -0.45, y: 0.84 }, { x: -0.41, y: 0.82 },
+    { x: -0.35, y: 0.80 }, { x: -0.31, y: 0.77 }, { x: -0.24, y: 0.76 }, { x: -0.26, y: 0.73 },
+    { x: -0.28, y: 0.70 }, { x: -0.32, y: 0.67 }, { x: -0.37, y: 0.65 }, { x: -0.40, y: 0.62 },
+    { x: -0.40, y: 0.58 }, { x: -0.32, y: 0.63 }, { x: -0.29, y: 0.65 }, { x: -0.25, y: 0.64 },
+    { x: -0.21, y: 0.62 }, { x: -0.19, y: 0.57 }, { x: -0.15, y: 0.52 }, { x: -0.11, y: 0.47 },
+    { x: -0.04, y: 0.38 }, { x: 0.02, y: 0.28 }, { x: 0.08, y: 0.21 }, { x: 0.07, y: 0.15 },
+    { x: -0.04, y: 0.06 }, { x: -0.15, y: 0.01 }, { x: -0.21, y: -0.02 }, { x: -0.28, y: -0.01 },
+    { x: -0.35, y: -0.03 }, { x: -0.27, y: -0.06 }, { x: -0.25, y: -0.10 }, { x: -0.22, y: -0.12 },
+    { x: -0.13, y: -0.13 }, { x: -0.14, y: -0.23 }, { x: -0.11, y: -0.31 }, { x: -0.08, y: -0.36 },
+    { x: -0.04, y: -0.41 }, { x: -0.00, y: -0.43 }, { x: 0.03, y: -0.47 }, { x: 0.06, y: -0.51 },
+    { x: 0.11, y: -0.58 }, { x: 0.15, y: -0.67 }, { x: 0.11, y: -0.74 }, { x: -0.00, y: -0.79 },
+    { x: -0.06, y: -0.84 }, { x: -0.10, y: -0.88 }, { x: -0.05, y: -0.89 }, { x: -0.00, y: -0.95 },
+    { x: -0.02, y: -0.98 }, { x: -0.09, y: -1.03 }, { x: 0.05, y: -0.99 }, { x: 0.15, y: -0.99 },
+    { x: 0.27, y: -1.00 }, { x: 0.35, y: -0.96 }, { x: 0.42, y: -0.92 }, { x: 0.47, y: -0.88 },
+    { x: 0.56, y: -0.84 }, { x: 0.79, y: -0.84 }, { x: 0.89, y: -0.79 }, { x: 0.97, y: -0.74 },
+    { x: 0.96, y: -0.68 }, { x: 0.88, y: -0.75 }, { x: 0.77, y: -0.78 }, { x: 0.68, y: -0.79 },
+    { x: 0.56, y: -0.81 }, { x: 0.45, y: -0.83 }, { x: 0.38, y: -0.90 }, { x: 0.26, y: -0.94 },
+    { x: 0.13, y: -0.95 }, { x: 0.01, y: -0.92 }, { x: -0.03, y: -0.86 }, { x: 0.06, y: -0.82 },
+    { x: 0.32, y: -0.87 }, { x: 0.12, y: -0.79 }, { x: 0.18, y: -0.74 }, { x: 0.24, y: -0.68 },
+    { x: 0.22, y: -0.60 }, { x: 0.14, y: -0.51 }, { x: 0.08, y: -0.43 }, { x: 0.06, y: -0.37 },
+    { x: 0.21, y: -0.37 }, { x: 0.45, y: -0.35 }, { x: 0.57, y: -0.35 }, { x: 0.74, y: -0.33 },
+    { x: 0.88, y: -0.36 }, { x: 0.96, y: -0.41 }, { x: 0.97, y: -0.36 }, { x: 0.87, y: -0.31 },
+    { x: 0.69, y: -0.29 }, { x: 0.50, y: -0.31 }, { x: 0.31, y: -0.32 }, { x: 0.14, y: -0.32 },
+    { x: 0.00, y: -0.33 }, { x: -0.03, y: -0.29 }, { x: -0.09, y: -0.20 }, { x: -0.10, y: -0.11 },
+    { x: 0.02, y: -0.12 }, { x: 0.24, y: -0.13 }, { x: 0.31, y: -0.10 }, { x: 0.38, y: -0.05 },
+    { x: 0.45, y: 0.00 }, { x: 0.71, y: -0.14 }, { x: 0.81, y: -0.13 }, { x: 0.90, y: -0.19 },
+    { x: 0.98, y: -0.18 }, { x: 0.95, y: -0.08 }, { x: 0.90, y: -0.08 }, { x: 0.71, y: -0.14 },
+    { x: 0.45, y: 0.01 }, { x: 0.56, y: 0.05 }, { x: 0.72, y: 0.04 }, { x: 0.87, y: 0.08 },
+    { x: 0.93, y: 0.13 }, { x: 0.98, y: 0.20 }, { x: 0.98, y: 0.36 }, { x: 0.98, y: 0.45 },
+    { x: 0.88, y: 0.52 }, { x: 0.71, y: 0.56 }, { x: 0.56, y: 0.56 }, { x: 0.34, y: 0.53 },
+    { x: 0.14, y: 0.52 }, { x: -0.01, y: 0.52 }, { x: -0.02, y: 0.48 }, { x: 0.13, y: 0.50 },
+    { x: 0.29, y: 0.50 }, { x: 0.50, y: 0.52 }, { x: 0.71, y: 0.53 }, { x: 0.80, y: 0.49 },
+    { x: 0.88, y: 0.44 }, { x: 0.95, y: 0.35 }, { x: 0.96, y: 0.29 }, { x: 0.90, y: 0.17 },
+    { x: 0.80, y: 0.11 }, { x: 0.67, y: 0.08 }, { x: 0.51, y: 0.08 }, { x: 0.45, y: 0.06 },
+    { x: 0.38, y: 0.02 }, { x: 0.33, y: -0.03 }, { x: 0.27, y: -0.06 }, { x: 0.11, y: -0.07 },
+    { x: -0.00, y: -0.09 }, { x: -0.06, y: -0.06 }, { x: -0.09, y: -0.01 }, { x: -0.01, y: 0.03 },
+    { x: 0.02, y: 0.06 }, { x: 0.30, y: 0.00 }, { x: 0.03, y: 0.02 }, { x: 0.05, y: 0.08 },
+    { x: 0.13, y: 0.14 }, { x: 0.14, y: 0.18 }, { x: 0.34, y: 0.21 }, { x: 0.18, y: 0.21 },
+    { x: 0.11, y: 0.27 }, { x: 0.06, y: 0.35 }, { x: 0.04, y: 0.41 }, { x: -0.02, y: 0.46 },
+    { x: -0.08, y: 0.53 }, { x: -0.13, y: 0.62 }, { x: -0.16, y: 0.67 }, { x: -0.19, y: 0.73 },
+    { x: -0.10, y: 0.76 }, { x: 0.10, y: 0.75 }, { x: 0.26, y: 0.75 }, { x: 0.29, y: 0.80 },
+    { x: 0.38, y: 0.86 }, { x: 0.66, y: 0.68 }, { x: 0.72, y: 0.72 }, { x: 0.86, y: 0.72 },
+    { x: 0.99, y: 0.70 }, { x: 0.87, y: 0.78 }, { x: 0.55, y: 0.74 }, { x: 0.50, y: 0.80 },
+    { x: 0.44, y: 0.87 }, { x: 0.52, y: 0.89 }, { x: 0.70, y: 0.90 }, { x: 0.81, y: 0.93 },
+    { x: 0.89, y: 0.97 }, { x: 0.95, y: 1.04 }, { x: 0.97, y: 1.17 }, { x: 0.90, y: 1.18 },
+    { x: 0.89, y: 1.09 }, { x: 0.83, y: 1.00 }, { x: 0.76, y: 0.97 }, { x: 0.59, y: 0.93 },
+    { x: 0.38, y: 0.93 }, { x: 0.32, y: 0.88 }, { x: 0.26, y: 0.84 }, { x: 0.21, y: 0.80 },
+    { x: 0.07, y: 0.77 }, { x: -0.11, y: 0.78 }, { x: -0.16, y: 0.84 }, { x: -0.11, y: 0.89 },
+    { x: 0.01, y: 0.90 }, { x: 0.28, y: 0.87 }, { x: -0.10, y: 0.92 }, { x: 0.05, y: 0.97 },
+    { x: 0.11, y: 1.05 }, { x: 0.30, y: 1.09 }, { x: 0.11, y: 1.09 }, { x: 0.06, y: 1.17 },
+    { x: -0.03, y: 1.18 }, { x: 0.01, y: 1.10 }, { x: -0.01, y: 1.00 }, { x: -0.16, y: 0.94 },
+    { x: -0.18, y: 0.89 }, { x: -0.21, y: 0.86 }, { x: -0.32, y: 0.86 }, { x: -0.45, y: 0.89 },
+    { x: -0.52, y: 0.94 }, { x: -0.56, y: 0.99 }, { x: -0.63, y: 1.02 }, { x: -0.66, y: 1.04 },
+    { x: -0.72, y: 1.05 }, { x: -0.76, y: 1.05 }, { x: -0.89, y: 1.07 }, { x: -0.90, y: 1.11 }
   ];
   
+  // Добавляем все узлы
   allNodes.forEach(node => network.addNode(node.x, node.y));
   
-  // ============================================
-  // СОЕДИНЯЕМ УЗЛЫ ДОРОГАМИ
-  // ============================================
-  
-  function connect(nodeList) {
-    for (let i = 0; i < nodeList.length - 1; i++) {
-      const start = network.nodes.find(n => 
-        Math.abs(n.x - nodeList[i].x) < 0.01 && 
-        Math.abs(n.y - nodeList[i].y) < 0.01
-      );
-      const end = network.nodes.find(n => 
-        Math.abs(n.x - nodeList[i+1].x) < 0.01 && 
-        Math.abs(n.y - nodeList[i+1].y) < 0.01
-      );
-      if (start && end) network.addRoad(start, end);
-    }
+  // ОСНОВНОЙ ПУТЬ (последовательно по вашим точкам)
+  for (let i = 0; i < allNodes.length - 1; i++) {
+    const s = network.nodes[i];
+    const e = network.nodes[i + 1];
+    if (s && e) network.addRoad(s, e);
   }
   
-  // ВНЕШНИЙ ПЕРИМЕТР (по часовой стрелке)
-  connect([l5, t1, t2, t3, t4, t5, t6, r1, r2, r3, r4, r5, r6, b1, b2, b3, b4, b5, l1, l2, l3, l4, l5]);
+  // Замыкаем петлю
+  network.addRoad(network.nodes[allNodes.length - 1], network.nodes[0]);
   
-  // КРУГОВАЯ РАЗВЯЗКА 1 (верхняя)
-  connect([conn2, roundabout1, conn1]);
-  connect([conn3, roundabout1, conn4]);
+  // ✅ ДОБАВЛЯЕМ СИНИЕ СОЕДИНЕНИЯ (перекрестки и ответвления)
   
-  // Соединения с развязкой 1
-  connect([t2, conn3]);
-  connect([conn4, c1]);
-  connect([conn1, c2]);
-  connect([conn2, l5]);
+  // Индексы узлов для синих соединений (смотрю на ваше изображение)
+  const blueConnections = [
+    // От развязки 1 к внутренним дорогам
+    [19, 28], [24, 29], [28, 32],
+    
+    // От развязки 2 к центру
+    [36, 44], [40, 108], [44, 45],
+    
+    // Внутренние перекрестки центра
+    [32, 166], [33, 167], [34, 168], [35, 157],
+    
+    // От развязки 3 к нижним дорогам
+    [54, 86], [57, 84], [59, 62],
+    
+    // Правая сторона - вертикальные соединения
+    [73, 94], [94, 113], [113, 124], [124, 128], [128, 133],
+    
+    // Центральные горизонтальные
+    [90, 93], [93, 113], [108, 157], [157, 166],
+    
+    // Верхняя часть - соединения к развязкам
+    [176, 180], [180, 184], [184, 190],
+    
+    // Дополнительные ответвления
+    [82, 85], [85, 90], [166, 177], [177, 186]
+  ];
   
-  // КРУГОВАЯ РАЗВЯЗКА 2 (средняя)
-  connect([conn6, roundabout2, conn5]);
-  connect([conn7, roundabout2, conn8]);
+  blueConnections.forEach(([idx1, idx2]) => {
+    const s = network.nodes[idx1];
+    const e = network.nodes[idx2];
+    if (s && e) {
+      network.addRoad(s, e);
+    }
+  });
   
-  // Соединения с развязкой 2
-  connect([l3, conn6]);
-  connect([conn5, c5]);
-  connect([conn7, c4]);
-  connect([conn8, c7]);
-  
-  // КРУГОВАЯ РАЗВЯЗКА 3 (нижняя)
-  connect([conn10, roundabout3, conn9]);
-  connect([conn11, roundabout3, conn12]);
-  
-  // Соединения с развязкой 3
-  connect([l1, conn10]);
-  connect([conn9, c10]);
-  connect([conn11, c11]);
-  connect([conn12, b4]);
-  
-  // ЦЕНТРАЛЬНЫЕ ГОРИЗОНТАЛЬНЫЕ ДОРОГИ
-  connect([c1, c2, c3, r_conn1, r1]);
-  connect([c4, c5, c6, r_conn2, r2]);
-  connect([c7, c8, c9, r_conn3, r4]);
-  connect([c10, c11, c12, r_conn4, r5]);
-  
-  // ЦЕНТРАЛЬНЫЕ ВЕРТИКАЛЬНЫЕ ДОРОГИ
-  connect([c1, c4, c7, c10]);
-  connect([c2, c5, c8, c11]);
-  connect([c3, c6, c9, c12]);
-  
-  // ДОПОЛНИТЕЛЬНЫЕ СОЕДИНЕНИЯ
-  connect([t3, c2]);
-  connect([t4, c3]);
-  connect([t5, r_conn1]);
-  connect([b2, c11]);
-  connect([b3, c10]);
-  
-  console.log(`✅ Дорожная сеть создана (органическая структура):`);
-  console.log(`   - Узлов: ${network.nodes.length}`);
-  console.log(`   - Дорог: ${network.roads.length}`);
-  console.log(`   - Круговых развязок: 3`);
+  console.log(`✅ Полная карта: ${network.nodes.length} узлов, ${network.roads.length} дорог`);
   
   // ============================================
   // ВИЗУАЛИЗАЦИЯ
   // ============================================
   
-  if (!showRoads) {
-    return network;
-  }
+  if (!showRoads) return network;
   
-  const roadMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x2a2a2a,
-    roughness: 0.9
+  const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 });
+  const lineMaterial = new THREE.LineDashedMaterial({
+    color: 0xffffff, linewidth: 2, dashSize: 0.03, gapSize: 0.02
   });
   
-  const centerLineMaterial = new THREE.LineDashedMaterial({
-    color: 0xffff00,
-    linewidth: 2,
-    dashSize: 0.03,
-    gapSize: 0.02
-  });
-  
-  // Рисуем дороги
   network.roads.forEach(road => {
-    const start = road.start;
-    const end = road.end;
+    const len = Math.hypot(road.end.x - road.start.x, road.end.y - road.start.y);
+    const geom = new THREE.PlaneGeometry(len, roadWidth);
+    const mesh = new THREE.Mesh(geom, roadMaterial);
     
-    const roadLength = Math.hypot(end.x - start.x, end.y - start.y);
-    const roadGeometry = new THREE.PlaneGeometry(roadLength, roadWidth);
-    const roadMesh = new THREE.Mesh(roadGeometry, roadMaterial);
+    mesh.position.set((road.start.x + road.end.x) / 2, 0.001, (road.start.y + road.end.y) / 2);
     
-    roadMesh.position.set(
-      (start.x + end.x) / 2,
-      0.001,
-      (start.y + end.y) / 2
-    );
+    const angle = Math.atan2(road.end.y - road.start.y, road.end.x - road.start.x);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.z = angle;
+    parent.add(mesh);
     
-    const angle = Math.atan2(end.y - start.y, end.x - start.x);
-    roadMesh.rotation.x = -Math.PI / 2;
-    roadMesh.rotation.z = angle;
-    
-    parent.add(roadMesh);
-    
-    // Центральная линия
-    const centerPoints = [
-      new THREE.Vector3(start.x, 0.002, start.y),
-      new THREE.Vector3(end.x, 0.002, end.y)
+    const pts = [
+      new THREE.Vector3(road.start.x, 0.002, road.start.y),
+      new THREE.Vector3(road.end.x, 0.002, road.end.y)
     ];
-    const centerGeometry = new THREE.BufferGeometry().setFromPoints(centerPoints);
-    const centerLine = new THREE.Line(centerGeometry, centerLineMaterial);
-    centerLine.computeLineDistances();
-    parent.add(centerLine);
+    const lineGeom = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(lineGeom, lineMaterial);
+    line.computeLineDistances();
+    parent.add(line);
   });
   
-  // Круговые развязки
-  [roundabout1, roundabout2, roundabout3].forEach(pos => {
-    const radius = 0.12;
+  // Развязки (примерные центры)
+  const roundabouts = [
+    { x: -0.32, y: 0.67, r: 0.08 },
+    { x: -0.21, y: -0.06, r: 0.08 },
+    { x: -0.04, y: -0.88, r: 0.08 }
+  ];
+  
+  roundabouts.forEach(rb => {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(rb.r - roadWidth/2, rb.r + roadWidth/2, 32),
+      roadMaterial
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(rb.x, 0.001, rb.y);
+    parent.add(ring);
     
-    const ringGeometry = new THREE.RingGeometry(radius - roadWidth/2, radius + roadWidth/2, 32);
-    const ringMesh = new THREE.Mesh(ringGeometry, roadMaterial);
-    ringMesh.rotation.x = -Math.PI / 2;
-    ringMesh.position.set(pos.x, 0.001, pos.y);
-    parent.add(ringMesh);
+    const inner = new THREE.Mesh(
+      new THREE.CircleGeometry(rb.r - roadWidth/2, 32),
+      new THREE.MeshStandardMaterial({ color: 0x4a7c4e })
+    );
+    inner.rotation.x = -Math.PI / 2;
+    inner.position.set(rb.x, 0.001, rb.y);
+    parent.add(inner);
     
-    const innerGeometry = new THREE.CircleGeometry(radius - roadWidth/2, 32);
-    const innerMesh = new THREE.Mesh(innerGeometry, new THREE.MeshStandardMaterial({ 
-      color: 0x4a7c4e 
-    }));
-    innerMesh.rotation.x = -Math.PI / 2;
-    innerMesh.position.set(pos.x, 0.001, pos.y);
-    parent.add(innerMesh);
-    
-    // Жёлтый круг в центре (как на ковре)
-    const yellowCircle = new THREE.Mesh(
+    const dot = new THREE.Mesh(
       new THREE.CircleGeometry(0.04, 32),
       new THREE.MeshStandardMaterial({ color: 0xffff00 })
     );
-    yellowCircle.rotation.x = -Math.PI / 2;
-    yellowCircle.position.set(pos.x, 0.002, pos.y);
-    parent.add(yellowCircle);
+    dot.rotation.x = -Math.PI / 2;
+    dot.position.set(rb.x, 0.002, rb.y);
+    parent.add(dot);
   });
-  
-  console.log('✅ Дорожная сеть визуализирована');
   
   return network;
 }
