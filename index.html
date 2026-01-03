@@ -8,7 +8,6 @@
   />
   <title>AR Carpet Game</title>
 
-  <!-- ===== IMPORT MAP - ИСПРАВЛЕНО: используем CDN без нарушения CSP ===== -->
   <script type="importmap">
   {
     "imports": {
@@ -31,7 +30,6 @@
       font-family: 'Arial', sans-serif;
     }
 
-    /* ✅ AR контейнер */
     #ar-container {
       position: absolute;
       inset: 0;
@@ -39,7 +37,6 @@
       touch-action: none;
     }
 
-    /* ✅ Canvas для nonAR режимов */
     canvas {
       position: fixed !important;
       top: 0 !important;
@@ -50,7 +47,6 @@
       display: block !important;
     }
 
-    /* ✅ Стартовый экран */
     #start {
       position: fixed;
       top: 50%;
@@ -105,7 +101,8 @@
       cursor: pointer;
     }
 
-    /* ✅ Переключатель режимов */
+
+
     #mode-ui {
       position: fixed;
       top: 10px;
@@ -121,7 +118,6 @@
       display: none !important;
     }
 
-    /* ✅ Стили кнопок */
     button {
       padding: 15px 25px;
       font-size: 18px;
@@ -159,7 +155,6 @@
       background: rgba(200, 255, 200, 0.95);
     }
 
-    /* ✅ Мобильная адаптация */
     @media (max-width: 768px) {
       #start {
         width: 90%;
@@ -206,6 +201,10 @@
       <div class="setting-item">
         <input type="checkbox" id="control-toggle" checked />
         <label for="control-toggle">🎛️ Панель управления машинками</label>
+      </div>
+      <div class="setting-item">
+        <input type="checkbox" id="logger-toggle" />
+        <label for="logger-toggle">📋 Показать логи (отладка)</label>
       </div>
       <div class="setting-item">
         <input type="checkbox" id="invert-toggle" />

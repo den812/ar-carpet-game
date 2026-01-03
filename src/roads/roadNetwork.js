@@ -1,19 +1,25 @@
 // ===================================
-// ФАЙЛ: src/roads/roadNetwork.js V3
-// ДОБАВЛЕНО:
-// - Двустороннее движение (две полосы)
-// - Правостороннее движение
-// - Раздельные полосы для каждого направления
+// ФАЙЛ: src/roads/roadNetwork.js V23
+// ИСПРАВЛЕНО:
+// - Добавлена валидация путей
+// - Защита от undefined узлов
 // ===================================
 
 export class RoadNetwork {
   constructor() {
     this.nodes = [];
     this.roads = [];
-    this.lanes = []; // Новое: полосы движения
+    this.lanes = [];
   }
 
   addNode(x, y) {
+    // ✅ Проверка валидности координат
+    if (typeof x !== 'number' || typeof y !== 'number' || 
+        isNaN(x) || isNaN(y)) {
+      console.error('❌ Invalid node coordinates:', x, y);
+      return null;
+    }
+    
     const existing = this.nodes.find(n => 
       Math.abs(n.x - x) < 0.01 && Math.abs(n.y - y) < 0.01
     );
@@ -26,6 +32,12 @@ export class RoadNetwork {
   }
 
   addRoad(startNode, endNode) {
+    // ✅ Проверка валидности узлов
+    if (!startNode || !endNode) {
+      console.error('❌ Invalid road nodes');
+      return null;
+    }
+    
     const start = this.nodes.find(n => 
       Math.abs(n.x - startNode.x) < 0.01 && Math.abs(n.y - startNode.y) < 0.01
     );
@@ -34,8 +46,8 @@ export class RoadNetwork {
     );
     
     if (!start || !end) {
-      console.error('Узлы не найдены для дороги', startNode, endNode);
-      return;
+      console.error('❌ Узлы не найдены для дороги', startNode, endNode);
+      return null;
     }
     
     const existing = this.roads.find(r => 
@@ -50,37 +62,31 @@ export class RoadNetwork {
     
     this.roads.push(road);
     
-    // ✅ ДВУСТОРОННЕЕ ДВИЖЕНИЕ: создаем ДВЕ полосы
-    // Ширина дороги = 0.08, смещение полосы = 0.02 (1/4 ширины)
     const laneOffset = 0.02;
     
-    // Вычисляем перпендикулярный вектор для смещения
     const angle = Math.atan2(end.y - start.y, end.x - start.x);
     const perpAngle = angle + Math.PI / 2;
     const offsetX = Math.cos(perpAngle) * laneOffset;
     const offsetY = Math.sin(perpAngle) * laneOffset;
     
-    // ПОЛОСА 1: от start к end (правая сторона)
     const lane1 = {
       start: start,
       end: end,
       direction: { x: end.x - start.x, y: end.y - start.y },
-      offset: { x: offsetX, y: offsetY }, // Смещение вправо по ходу движения
+      offset: { x: offsetX, y: offsetY },
       length: length
     };
     
-    // ПОЛОСА 2: от end к start (правая сторона в обратном направлении)
     const lane2 = {
       start: end,
       end: start,
       direction: { x: start.x - end.x, y: start.y - end.y },
-      offset: { x: -offsetX, y: -offsetY }, // Смещение вправо по ходу движения
+      offset: { x: -offsetX, y: -offsetY },
       length: length
     };
     
     this.lanes.push(lane1, lane2);
     
-    // Добавляем связи (двунаправленные)
     if (!start.connections.includes(end)) {
       start.connections.push(end);
     }
@@ -92,13 +98,34 @@ export class RoadNetwork {
   }
 
   getRandomNode() {
+    if (this.nodes.length === 0) {
+      console.error('❌ No nodes in network');
+      return null;
+    }
     return this.nodes[Math.floor(Math.random() * this.nodes.length)];
   }
 
   findPath(start, end, maxDepth = 20) {
+    // ✅ Валидация входных данных
+    if (!start || !end) {
+      console.error('❌ Invalid start or end node');
+      return [];
+    }
+    
+    if (typeof start.x !== 'number' || typeof start.y !== 'number' ||
+        typeof end.x !== 'number' || typeof end.y !== 'number') {
+      console.error('❌ Invalid node coordinates in findPath');
+      return [];
+    }
+    
     // Если старт = конец, выбираем другой конец
     if (start === end) {
-      end = this.nodes.find(n => n !== start) || start;
+      const alternatives = this.nodes.filter(n => n !== start);
+      if (alternatives.length === 0) {
+        console.error('❌ Only one node in network');
+        return [];
+      }
+      end = alternatives[Math.floor(Math.random() * alternatives.length)];
     }
     
     // A* поиск пути
@@ -115,8 +142,8 @@ export class RoadNetwork {
       const current = openSet.shift();
       
       if (current.node === end) {
-        // ✅ Проверяем что путь достаточно длинный
-        if (current.path.length >= 2) {
+        // ✅ Валидация найденного пути
+        if (current.path.length >= 2 && this.validatePath(current.path)) {
           return current.path;
         }
       }
@@ -125,6 +152,12 @@ export class RoadNetwork {
       
       for (const neighbor of current.node.connections) {
         if (closedSet.has(neighbor)) continue;
+        
+        // ✅ Проверка валидности соседа
+        if (!neighbor || typeof neighbor.x !== 'number' || typeof neighbor.y !== 'number') {
+          console.warn('⚠️ Invalid neighbor node, skipping');
+          continue;
+        }
         
         const newCost = current.cost + Math.hypot(
           neighbor.x - current.node.x,
@@ -146,22 +179,44 @@ export class RoadNetwork {
       }
     }
     
-    // ✅ Путь не найден - создаем простой путь через соседние узлы
-    console.warn('⚠️ Путь не найден, создаем простой маршрут');
+    // Путь не найден - создаем простой путь
+    console.warn('⚠️ Путь не найден A*, создаем простой маршрут');
     
     if (start.connections.length > 0) {
-      const neighbor = start.connections[Math.floor(Math.random() * start.connections.length)];
-      return [start, neighbor];
+      const validNeighbors = start.connections.filter(n => 
+        n && typeof n.x === 'number' && typeof n.y === 'number'
+      );
+      
+      if (validNeighbors.length > 0) {
+        const neighbor = validNeighbors[Math.floor(Math.random() * validNeighbors.length)];
+        return [start, neighbor];
+      }
     }
     
-    // Последняя попытка - берем любые два узла
-    const allNodes = this.nodes.filter(n => n !== start);
-    if (allNodes.length > 0) {
-      return [start, allNodes[0]];
+    // Последняя попытка
+    const validNodes = this.nodes.filter(n => 
+      n !== start && n && typeof n.x === 'number' && typeof n.y === 'number'
+    );
+    
+    if (validNodes.length > 0) {
+      return [start, validNodes[0]];
     }
     
-    console.error('❌ Невозможно создать путь - нет связанных узлов');
-    return [start, start]; // Минимальный путь
+    console.error('❌ Невозможно создать путь');
+    return [];
+  }
+
+  // ✅ Новый метод: валидация пути
+  validatePath(path) {
+    if (!path || path.length < 2) return false;
+    
+    for (const node of path) {
+      if (!node || typeof node.x !== 'number' || typeof node.y !== 'number') {
+        return false;
+      }
+    }
+    
+    return true;
   }
 
   heuristic(node, goal) {
@@ -169,6 +224,8 @@ export class RoadNetwork {
   }
 
   getClosestNode(x, y) {
+    if (this.nodes.length === 0) return null;
+    
     let closest = this.nodes[0];
     let minDist = Infinity;
     
@@ -183,8 +240,9 @@ export class RoadNetwork {
     return closest;
   }
 
-  // ✅ НОВЫЙ МЕТОД: получить полосу движения между узлами
   getLane(fromNode, toNode) {
+    if (!fromNode || !toNode) return null;
+    
     return this.lanes.find(lane => 
       lane.start === fromNode && lane.end === toNode
     );

@@ -1,6 +1,6 @@
 // ===================================
-// ФАЙЛ: src/ui/StartScreen.js
-// Без изменений - работает корректно
+// ФАЙЛ: src/ui/StartScreen.js V26
+// ДОБАВЛЕНО: Опция для логгера
 // ===================================
 
 export function initStartScreen(cb) {
@@ -8,13 +8,15 @@ export function initStartScreen(cb) {
   
   // Читаем сохраненные настройки
   const showStats = localStorage.getItem('showStats') !== 'false';
-  const showControl = localStorage.getItem('showControl') !== 'false'; // ✅ НОВОЕ
+  const showControl = localStorage.getItem('showControl') !== 'false';
+  const showLogger = localStorage.getItem('showLogger') === 'true'; // ✅ НОВОЕ
   const invertControls = localStorage.getItem('invertControls') === 'true';
   const showRoads = localStorage.getItem('showRoads') === 'true';
   
   // Чекбоксы настроек
   const statsCheckbox = el.querySelector('#stats-toggle');
-  const controlCheckbox = el.querySelector('#control-toggle'); // ✅ НОВОЕ
+  const controlCheckbox = el.querySelector('#control-toggle');
+  const loggerCheckbox = el.querySelector('#logger-toggle'); // ✅ НОВОЕ
   const invertCheckbox = el.querySelector('#invert-toggle');
   const roadsCheckbox = el.querySelector('#roads-toggle');
   
@@ -25,11 +27,18 @@ export function initStartScreen(cb) {
     };
   }
   
-  // ✅ НОВОЕ: Чекбокс панели управления
   if (controlCheckbox) {
     controlCheckbox.checked = showControl;
     controlCheckbox.onchange = () => {
       localStorage.setItem('showControl', controlCheckbox.checked);
+    };
+  }
+  
+  // ✅ НОВОЕ: Чекбокс логгера
+  if (loggerCheckbox) {
+    loggerCheckbox.checked = showLogger;
+    loggerCheckbox.onchange = () => {
+      localStorage.setItem('showLogger', loggerCheckbox.checked);
     };
   }
   
@@ -53,7 +62,8 @@ export function initStartScreen(cb) {
       el.style.display = "none";
       cb(b.dataset.mode, {
         showStats: statsCheckbox ? statsCheckbox.checked : showStats,
-        showControl: controlCheckbox ? controlCheckbox.checked : showControl, // ✅ НОВОЕ
+        showControl: controlCheckbox ? controlCheckbox.checked : showControl,
+        showLogger: loggerCheckbox ? loggerCheckbox.checked : showLogger, // ✅ НОВОЕ
         invertControls: invertCheckbox ? invertCheckbox.checked : invertControls,
         showRoads: roadsCheckbox ? roadsCheckbox.checked : showRoads
       });
