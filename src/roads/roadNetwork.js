@@ -1,8 +1,8 @@
 // ===================================
-// ФАЙЛ: src/roads/roadNetwork.js V23
+// ФАЙЛ: src/roads/roadNetwork.js V24
 // ИСПРАВЛЕНО:
-// - Добавлена валидация путей
-// - Защита от undefined узлов
+// - Добавлена проверка на Infinity в addNode()
+// - Улучшена валидация координат
 // ===================================
 
 export class RoadNetwork {
@@ -13,9 +13,10 @@ export class RoadNetwork {
   }
 
   addNode(x, y) {
-    // ✅ Проверка валидности координат
+    // ✅ Проверка валидности координат (включая Infinity)
     if (typeof x !== 'number' || typeof y !== 'number' || 
-        isNaN(x) || isNaN(y)) {
+        isNaN(x) || isNaN(y) || 
+        !isFinite(x) || !isFinite(y)) {
       console.error('❌ Invalid node coordinates:', x, y);
       return null;
     }
@@ -113,7 +114,9 @@ export class RoadNetwork {
     }
     
     if (typeof start.x !== 'number' || typeof start.y !== 'number' ||
-        typeof end.x !== 'number' || typeof end.y !== 'number') {
+        typeof end.x !== 'number' || typeof end.y !== 'number' ||
+        !isFinite(start.x) || !isFinite(start.y) ||
+        !isFinite(end.x) || !isFinite(end.y)) {
       console.error('❌ Invalid node coordinates in findPath');
       return [];
     }
@@ -154,7 +157,8 @@ export class RoadNetwork {
         if (closedSet.has(neighbor)) continue;
         
         // ✅ Проверка валидности соседа
-        if (!neighbor || typeof neighbor.x !== 'number' || typeof neighbor.y !== 'number') {
+        if (!neighbor || typeof neighbor.x !== 'number' || typeof neighbor.y !== 'number' ||
+            !isFinite(neighbor.x) || !isFinite(neighbor.y)) {
           console.warn('⚠️ Invalid neighbor node, skipping');
           continue;
         }
@@ -184,7 +188,8 @@ export class RoadNetwork {
     
     if (start.connections.length > 0) {
       const validNeighbors = start.connections.filter(n => 
-        n && typeof n.x === 'number' && typeof n.y === 'number'
+        n && typeof n.x === 'number' && typeof n.y === 'number' &&
+        isFinite(n.x) && isFinite(n.y)
       );
       
       if (validNeighbors.length > 0) {
@@ -195,7 +200,8 @@ export class RoadNetwork {
     
     // Последняя попытка
     const validNodes = this.nodes.filter(n => 
-      n !== start && n && typeof n.x === 'number' && typeof n.y === 'number'
+      n !== start && n && typeof n.x === 'number' && typeof n.y === 'number' &&
+      isFinite(n.x) && isFinite(n.y)
     );
     
     if (validNodes.length > 0) {
@@ -206,12 +212,16 @@ export class RoadNetwork {
     return [];
   }
 
-  // ✅ Новый метод: валидация пути
+  // ✅ Улучшенная валидация пути
   validatePath(path) {
     if (!path || path.length < 2) return false;
     
     for (const node of path) {
-      if (!node || typeof node.x !== 'number' || typeof node.y !== 'number') {
+      if (!node || 
+          typeof node.x !== 'number' || 
+          typeof node.y !== 'number' ||
+          !isFinite(node.x) ||
+          !isFinite(node.y)) {
         return false;
       }
     }
@@ -243,9 +253,11 @@ export class RoadNetwork {
   getLane(fromNode, toNode) {
     if (!fromNode || !toNode) return null;
     
-    return this.lanes.find(lane => 
+    const lane = this.lanes.find(lane => 
       lane.start === fromNode && lane.end === toNode
     );
+    
+    return lane || null;
   }
 
   getRoadBetween(node1, node2) {

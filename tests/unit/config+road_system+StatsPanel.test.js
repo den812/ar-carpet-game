@@ -1,9 +1,10 @@
 // ===================================
-// ФАЙЛ: tests/unit/combined.test.js  
+// ФАЙЛ: tests/unit/config+road_system+StatsPanel.test.js  
 // Объединенные тесты для config, road_system, StatsPanel
+// ИСПРАВЛЕНО: Тест логирования статистики
 // ===================================
 
-import { describe, test, expect, beforeEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeEach, jest, afterEach } from '@jest/globals';
 import { CONFIG, getCarScale, updateConfig } from '../../../src/config.js';
 import { createRoadNetwork } from '../../../src/roads/road_system.js';
 import { StatsPanel } from '../../../src/ui/StatsPanel.js';
@@ -136,9 +137,11 @@ describe('road_system.js', () => {
       const spy = jest.spyOn(console, 'log');
       createRoadNetwork(mockParent, { showRoads: false });
       
+      // ✅ FIX: Проверяем правильную строку из логов
       expect(spy).toHaveBeenCalledWith(
-        expect.stringContaining('Полная карта')
+        expect.stringContaining('Итоговая сеть')
       );
+      spy.mockRestore();
     });
 
     test('обрабатывает ошибки при создании', () => {

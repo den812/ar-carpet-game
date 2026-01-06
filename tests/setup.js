@@ -3,6 +3,7 @@
 // Jest setup - моки и глобальные настройки
 // ===================================
 
+import { jest } from '@jest/globals';
 import 'jest-canvas-mock';
 import '@testing-library/jest-dom';
 

@@ -1,8 +1,8 @@
 // ===================================
-// ФАЙЛ: src/cars/Car.js V23
+// ФАЙЛ: src/cars/Car.js V24
 // ИСПРАВЛЕНО:
-// - Добавлены проверки на undefined для current и next
-// - Защита от краш-ошибок "Cannot read properties of undefined"
+// - Исправлена проблема с немедленным деспавном после spawn
+// - Добавлена защита от выхода за пределы массива path
 // ===================================
 
 import * as THREE from 'three';
@@ -72,8 +72,19 @@ export class Car {
     
     this.path = this.roadNetwork.findPath(startNode, endNode);
     
-    if (this.path.length < 2) {
-      console.error('❌ Path too short:', this.path.length);
+    if (!this.path || this.path.length < 2) {
+      console.error('❌ Path too short:', this.path ? this.path.length : 0);
+      return false;
+    }
+    
+    // ✅ FIX: Проверяем что первые два узла валидны ДО установки индекса
+    const first = this.path[0];
+    const second = this.path[1];
+    
+    if (!first || !second || 
+        typeof first.x !== 'number' || typeof first.y !== 'number' ||
+        typeof second.x !== 'number' || typeof second.y !== 'number') {
+      console.error('❌ Invalid path nodes:', first, second);
       return false;
     }
     
@@ -82,11 +93,10 @@ export class Car {
     this.isActive = true;
     this.isStopped = false;
     
-    this.currentLane = this.roadNetwork.getLane(this.path[0], this.path[1]);
+    this.currentLane = this.roadNetwork.getLane(first, second);
     
-    const start = this.path[0];
-    let startX = start.x;
-    let startY = start.y;
+    let startX = first.x;
+    let startY = first.y;
     
     if (this.currentLane) {
       startX += this.currentLane.offset.x;
@@ -95,29 +105,33 @@ export class Car {
     
     this.model.position.set(startX, this.heightAboveRoad, startY);
     
-    if (this.path.length > 1) {
-      const next = this.path[1];
-      const dx = next.x - start.x;
-      const dy = next.y - start.y;
-      this.targetRotation = Math.atan2(dy, dx);
-      this.currentRotation = this.targetRotation;
-      this.model.rotation.y = -this.targetRotation + Math.PI / 2;
-    }
+    const dx = second.x - first.x;
+    const dy = second.y - first.y;
+    this.targetRotation = Math.atan2(dy, dx);
+    this.currentRotation = this.targetRotation;
+    this.model.rotation.y = -this.targetRotation + Math.PI / 2;
     
     this.model.visible = true;
     return true;
   }
 
   update() {
-    if (!this.isActive || this.path.length < 2) return;
+    if (!this.isActive || !this.path || this.path.length < 2) {
+      return;
+    }
     
-    // ✅ FIX: Проверка на undefined ПЕРЕД использованием
+    // ✅ FIX: Проверяем границы ПЕРЕД доступом к элементам
+    if (this.currentPathIndex >= this.path.length - 1) {
+      this.despawn();
+      return;
+    }
+    
     const current = this.path[this.currentPathIndex];
     const next = this.path[this.currentPathIndex + 1];
     
-    // ✅ FIX: Если current или next undefined - деспавним машину
+    // ✅ FIX: Проверка на существование узлов
     if (!current || !next) {
-      console.warn('⚠️ Undefined path nodes, despawning car');
+      console.warn('⚠️ Undefined path nodes at index', this.currentPathIndex);
       this.despawn();
       return;
     }
@@ -177,6 +191,7 @@ export class Car {
       this.currentPathIndex++;
       this.progress = 0;
       
+      // ✅ FIX: Проверяем границы после инкремента
       if (this.currentPathIndex >= this.path.length - 1) {
         this.despawn();
         return;
@@ -228,7 +243,6 @@ export class Car {
     this.model.scale.setScalar(baseScale * scale);
   }
 
-  // ✅ Методы для управления коллизиями
   stopForCollision() {
     this.isStopped = true;
   }
@@ -241,7 +255,7 @@ export class Car {
     if (!this.isActive || !otherCar.isActive) return false;
     
     const distance = this.model.position.distanceTo(otherCar.model.position);
-    const minDistance = 0.15; // Минимальное расстояние между машинами
+    const minDistance = 0.15;
     
     return distance < minDistance;
   }

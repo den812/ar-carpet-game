@@ -1,8 +1,8 @@
 // ===================================
-// ФАЙЛ: src/traffic/traffic_manager.js V23
+// ФАЙЛ: src/traffic/traffic_manager.js V24
 // ИСПРАВЛЕНО: 
-// - Добавлена валидация перед спавном
-// - Защита от undefined узлов
+// - Добавлен метод respawnCar для тестов
+// - Улучшено логирование спавна
 // ===================================
 
 import { Car } from '../cars/Car.js';
@@ -63,13 +63,17 @@ export class TrafficManager {
           const car = await this.spawnCarWithModel(modelData);
           if (car) {
             spawned++;
+            console.log(`✅ Успешно заспавнена машина ${spawned}/${count}: ${modelName}`);
+          } else {
+            console.warn(`⚠️ Не удалось заспавнить машину: ${modelName}`);
           }
           await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
     }
     
-    console.log(`✅ Успешно заспавнено ${spawned}/${count} машин`);
+    console.log(`✅ Итого заспавнено ${spawned}/${count} машин`);
+    console.log(`📊 Активных машин: ${this.cars.filter(c => c.isActive).length}`);
   }
 
   async spawnSingleCar() {
@@ -83,7 +87,7 @@ export class TrafficManager {
       return null;
     }
 
-    console.log(`🚗 Попытка спавна: ${modelData.name}`);
+    console.log(`🔄 Попытка спавна: ${modelData.name}`);
 
     // ✅ Получаем случайные ВАЛИДНЫЕ узлы
     const startNode = this.roadNetwork.getRandomNode();
@@ -130,14 +134,39 @@ export class TrafficManager {
     const success = car.spawn(startNode, endNode);
     
     if (!success) {
-      console.warn('⚠️ Не удалось заспавнить машину');
+      console.warn(`⚠️ Не удалось заспавнить машину ${modelData.name}`);
       this.parent.remove(car.model);
       this.cars = this.cars.filter(c => c !== car);
       return null;
     }
     
-    console.log(`✅ Машина ${modelData.name} успешно заспавнена`);
+    // ✅ Проверяем что машина реально активна после spawn
+    if (!car.isActive) {
+      console.error(`❌ Машина ${modelData.name} не активна после spawn!`);
+      this.parent.remove(car.model);
+      this.cars = this.cars.filter(c => c !== car);
+      return null;
+    }
+    
+    console.log(`✅ Машина ${modelData.name} успешно заспавнена и активна`);
     return car;
+  }
+
+  // ✅ Метод для ручного респавна (требуется в тестах)
+  async respawnCar(car) {
+    if (!car) return null;
+    
+    const modelData = this.carModels.getModelByName(car.modelName);
+    if (!modelData) return null;
+    
+    // Удаляем старую машину
+    if (car.model.parent) {
+      car.model.parent.remove(car.model);
+    }
+    this.cars = this.cars.filter(c => c !== car);
+    
+    // Создаём новую
+    return await this.spawnCarWithModel(modelData);
   }
 
   update() {
@@ -174,10 +203,7 @@ export class TrafficManager {
         // Если машина завершила путь, респавним
         if (!car.isActive) {
           setTimeout(() => {
-            const modelData = this.carModels.getModelByName(car.modelName);
-            if (modelData) {
-              this.spawnCarWithModel(modelData);
-            }
+            this.respawnCar(car);
           }, Math.random() * 2000 + 500);
         }
       } catch (error) {

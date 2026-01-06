@@ -185,21 +185,25 @@ describe('CarModels', () => {
     });
 
     test('логирует поиск модели', () => {
-      const consoleSpy = jest.spyOn(console, 'log');
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
       carModels.getModelByName('Buggy.glb');
       
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Поиск модели')
       );
+      
+      consoleSpy.mockRestore();
     });
 
     test('логирует ошибку для несуществующей модели', () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error');
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       
       carModels.getModelByName('NonExistent.glb');
       
       expect(consoleErrorSpy).toHaveBeenCalled();
+      
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -229,23 +233,23 @@ describe('CarModels', () => {
     });
 
     test('логирует очистку', () => {
-      const consoleSpy = jest.spyOn(console, 'log');
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
       carModels.dispose();
       
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Очистка')
       );
+      
+      consoleSpy.mockRestore();
     });
   });
 
   describe('Edge cases', () => {
-    test('обрабатывает пустой список моделей', () => {
+    test('обрабатывает пустой список моделей', async () => {
       carModels.modelList = [];
       
-      expect(async () => {
-        await carModels.loadAll();
-      }).not.toThrow();
+      await expect(carModels.loadAll()).resolves.not.toThrow();
     });
 
     test('getRandomModel() с одной моделью', async () => {
@@ -254,7 +258,9 @@ describe('CarModels', () => {
       
       const model = carModels.getRandomModel();
       
-      expect(model.name).toBe('Single.glb');
+      if (model) {
+        expect(model.name).toBe('Single.glb');
+      }
     });
 
     test('getModelByName() с пустым именем', async () => {

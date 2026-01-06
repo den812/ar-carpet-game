@@ -1,5 +1,5 @@
 // ===================================
-// ФАЙЛ: tests/__mocks__/three.js
+// ФАЙЛ: tests/mocks/three.js
 // Mock для Three.js
 // ===================================
 
@@ -30,6 +30,10 @@ export class Vector3 {
     const dz = this.z - v.z;
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
+  
+  clone() {
+    return new Vector3(this.x, this.y, this.z);
+  }
 }
 
 export class Euler {
@@ -37,6 +41,10 @@ export class Euler {
     this.x = x;
     this.y = y;
     this.z = z;
+  }
+  
+  clone() {
+    return new Euler(this.x, this.y, this.z);
   }
 }
 
@@ -46,6 +54,10 @@ export class Quaternion {
     this.y = y;
     this.z = z;
     this.w = w;
+  }
+  
+  clone() {
+    return new Quaternion(this.x, this.y, this.z, this.w);
   }
 }
 
@@ -57,6 +69,12 @@ export class Matrix4 {
   fromArray(array) {
     this.elements = [...array];
     return this;
+  }
+  
+  clone() {
+    const m = new Matrix4();
+    m.elements = [...this.elements];
+    return m;
   }
 }
 
@@ -109,6 +127,18 @@ export class Group {
       }
     });
   }
+  
+  clone() {
+    const cloned = new Group();
+    cloned.position = this.position.clone();
+    cloned.rotation = this.rotation.clone();
+    cloned.scale = this.scale.clone();
+    cloned.visible = this.visible;
+    cloned.children = this.children.map(child => 
+      child.clone ? child.clone() : child
+    );
+    return cloned;
+  }
 }
 
 export class Mesh extends Group {
@@ -124,6 +154,18 @@ export class Mesh extends Group {
   getWorldPosition(target) {
     target.copy(this.position);
     return target;
+  }
+  
+  clone() {
+    const cloned = new Mesh(this.geometry, this.material);
+    cloned.position = this.position.clone();
+    cloned.rotation = this.rotation.clone();
+    cloned.scale = this.scale.clone();
+    cloned.visible = this.visible;
+    cloned.children = this.children.map(child => 
+      child.clone ? child.clone() : child
+    );
+    return cloned;
   }
 }
 
@@ -177,19 +219,51 @@ export class Color {
     this.b = color.b;
     return this;
   }
+  
+  clone() {
+    const c = new Color();
+    c.r = this.r;
+    c.g = this.g;
+    c.b = this.b;
+    return c;
+  }
 }
 
-export class PlaneGeometry {}
+export class PlaneGeometry {
+  clone() {
+    return new PlaneGeometry();
+  }
+}
+
 export class RingGeometry {
   rotateX(angle) {
     return this;
   }
+  
+  clone() {
+    return new RingGeometry();
+  }
 }
-export class CircleGeometry {}
-export class BoxGeometry {}
+
+export class CircleGeometry {
+  clone() {
+    return new CircleGeometry();
+  }
+}
+
+export class BoxGeometry {
+  clone() {
+    return new BoxGeometry();
+  }
+}
+
 export class BufferGeometry {
   setFromPoints(points) {
     return this;
+  }
+  
+  clone() {
+    return new BufferGeometry();
   }
 }
 
@@ -197,6 +271,11 @@ export class MeshBasicMaterial {
   constructor(params) {
     this.color = params?.color ? new Color(params.color) : new Color();
     this.side = params?.side;
+  }
+  
+  clone() {
+    const m = new MeshBasicMaterial({ color: this.color, side: this.side });
+    return m;
   }
 }
 
@@ -207,6 +286,16 @@ export class MeshStandardMaterial {
     this.side = params?.side;
     this.roughness = params?.roughness || 0.5;
   }
+  
+  clone() {
+    const m = new MeshStandardMaterial({
+      color: this.color,
+      map: this.map,
+      side: this.side,
+      roughness: this.roughness
+    });
+    return m;
+  }
 }
 
 export class LineDashedMaterial {
@@ -215,6 +304,15 @@ export class LineDashedMaterial {
     this.linewidth = params?.linewidth;
     this.dashSize = params?.dashSize;
     this.gapSize = params?.gapSize;
+  }
+  
+  clone() {
+    return new LineDashedMaterial({
+      color: this.color,
+      linewidth: this.linewidth,
+      dashSize: this.dashSize,
+      gapSize: this.gapSize
+    });
   }
 }
 
@@ -225,6 +323,10 @@ export class Line {
   }
   
   computeLineDistances() {}
+  
+  clone() {
+    return new Line(this.geometry, this.material);
+  }
 }
 
 export class HemisphereLight {
