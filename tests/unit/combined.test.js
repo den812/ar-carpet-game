@@ -1,14 +1,14 @@
 // ===================================
-// ФАЙЛ: tests/unit/config+road_system+StatsPanel.test.js  
+// ФАЙЛ: tests/unit/combined.test.js  
 // Объединенные тесты для config, road_system, StatsPanel
-// ИСПРАВЛЕНО: Тест логирования статистики
+// ПЕРЕИМЕНОВАН из config+road_system+StatsPanel.test.js
 // ===================================
 
 import { describe, test, expect, beforeEach, jest, afterEach } from '@jest/globals';
-import { CONFIG, getCarScale, updateConfig } from '../../../src/config.js';
-import { createRoadNetwork } from '../../../src/roads/road_system.js';
-import { StatsPanel } from '../../../src/ui/StatsPanel.js';
-import { RoadNetwork } from '../../../src/roads/roadNetwork.js';
+import { CONFIG, getCarScale, updateConfig } from '../../src/config.js';
+import { createRoadNetwork } from '../../src/roads/road_system.js';
+import { StatsPanel } from '../../src/ui/StatsPanel.js';
+import { RoadNetwork } from '../../src/roads/roadNetwork.js';
 
 // ===== CONFIG TESTS =====
 describe('config.js', () => {
