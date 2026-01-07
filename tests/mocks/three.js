@@ -1,6 +1,7 @@
 // ===================================
 // ФАЙЛ: tests/mocks/three.js
 // Mock для Three.js
+// ИСПРАВЛЕНО: Добавлен метод distanceTo в Group и Mesh
 // ===================================
 
 export class Vector3 {

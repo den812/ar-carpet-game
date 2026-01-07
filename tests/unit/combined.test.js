@@ -1,7 +1,7 @@
 // ===================================
 // ФАЙЛ: tests/unit/combined.test.js  
 // Объединенные тесты для config, road_system, StatsPanel
-// ПЕРЕИМЕНОВАН из config+road_system+StatsPanel.test.js
+// ИСПРАВЛЕНО: Правильная проверка логов с эмодзи
 // ===================================
 
 import { describe, test, expect, beforeEach, jest, afterEach } from '@jest/globals';
@@ -137,10 +137,11 @@ describe('road_system.js', () => {
       const spy = jest.spyOn(console, 'log');
       createRoadNetwork(mockParent, { showRoads: false });
       
-      // ✅ FIX: Проверяем правильную строку из логов
-      expect(spy).toHaveBeenCalledWith(
-        expect.stringContaining('Итоговая сеть')
-      );
+      // ✅ FIX: Ищем либо с эмодзи, либо без
+      const calls = spy.mock.calls.map(call => call.join(' '));
+      const hasStats = calls.some(call => call.includes('Итоговая сеть'));
+      
+      expect(hasStats).toBe(true);
       spy.mockRestore();
     });
 
