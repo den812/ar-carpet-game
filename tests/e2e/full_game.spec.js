@@ -170,7 +170,7 @@ test.describe('Performance', () => {
 });
 
 test.describe('Mobile specific', () => {
-  test.use({ viewport: { width: 393, height: 851 } });
+  test.use({ viewport: { width: 375, height: 667 } });
   
   test('Игра запускается на мобильном', async ({ page }) => {
     await page.goto('/');

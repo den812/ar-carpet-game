@@ -1,6 +1,6 @@
 // ===================================
 // ФАЙЛ: src/cars/CarModels.js
-// ИСПРАВЛЕНО: TypeError is not a constructor
+// ИСПРАВЛЕНО V29: getRandomModel() и getModelByName() возвращают правильные объекты
 // ===================================
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -71,6 +71,12 @@ export class CarModels {
     const randomIndex = Math.floor(Math.random() * this.models.length);
     const selectedModel = this.models[randomIndex];
     
+    // ✅ FIX: Проверяем что модель существует и клонируем правильно
+    if (!selectedModel || !selectedModel.model) {
+      console.error('❌ Выбранная модель некорректна');
+      return null;
+    }
+    
     // Клонируем модель для повторного использования
     return {
       name: selectedModel.name,
@@ -82,9 +88,20 @@ export class CarModels {
     console.log(`🔍 Поиск модели: ${name}`);
     console.log(`📦 Доступные модели:`, this.models.map(m => m.name));
     
+    if (!this.isLoaded || this.models.length === 0) {
+      console.error('❌ Модели не загружены');
+      return null;
+    }
+    
     const found = this.models.find(m => m.name === name);
     if (!found) {
       console.error(`❌ Модель ${name} не найдена`);
+      return null;
+    }
+    
+    // ✅ FIX: Проверяем что модель существует и клонируем правильно
+    if (!found.model) {
+      console.error(`❌ Модель ${name} не имеет 3D объекта`);
       return null;
     }
     

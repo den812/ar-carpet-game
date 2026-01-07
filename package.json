@@ -45,9 +45,7 @@
       "**/tests/integration/**/*.test.js"
     ],
     "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/tests/integraition/",
-      "/tests/unit/config+road_system+StatsPanel.test.js"
+      "/node_modules/"
     ]
   },
   "devDependencies": {
