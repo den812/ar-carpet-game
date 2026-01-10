@@ -1,6 +1,7 @@
 // ===================================
-// ФАЙЛ: src/traffic/traffic_manager.js V24
+// ФАЙЛ: src/traffic/traffic_manager.js V25
 // ИСПРАВЛЕНО: 
+// - Исправлен метод getStats() - pooledCars теперь правильно вычисляется
 // - Добавлен метод respawnCar для тестов
 // - Улучшено логирование спавна
 // ===================================
@@ -225,11 +226,12 @@ export class TrafficManager {
 
   getStats() {
     const activeCars = this.cars.filter(c => c.isActive).length;
+    const pooledCars = this.cars.length - activeCars; // ✅ ИСПРАВЛЕНО: правильный подсчет неактивных машин
     
     return {
       totalCars: this.cars.length,
       activeCars: activeCars,
-      pooledCars: 0
+      pooledCars: pooledCars
     };
   }
 
