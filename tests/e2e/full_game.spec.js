@@ -1,6 +1,7 @@
 // ===================================
 // ФАЙЛ: tests/e2e/full_game.spec.js
 // E2E тесты полного игрового процесса
+// ИСПРАВЛЕНО: Упрощена конфигурация мобильных тестов
 // ===================================
 
 import { test, expect } from '@playwright/test';
@@ -13,13 +14,13 @@ test.describe('Full Game Flow', () => {
     await expect(page.locator('#start')).toBeVisible();
     await expect(page.locator('h2')).toHaveText('🎮 AR CARPET GAME');
     
-    // Кнопки режимов видны
-    await expect(page.locator('[data-mode="AR"]')).toBeVisible();
-    await expect(page.locator('[data-mode="TOUCH"]')).toBeVisible();
-    await expect(page.locator('[data-mode="GYRO"]')).toBeVisible();
+    // Кнопки режимов видны НА СТАРТОВОМ ЭКРАНЕ (уточняем селектор)
+    await expect(page.locator('#start [data-mode="AR"]')).toBeVisible();
+    await expect(page.locator('#start [data-mode="TOUCH"]')).toBeVisible();
+    await expect(page.locator('#start [data-mode="GYRO"]')).toBeVisible();
     
-    // Запускаем TOUCH режим
-    await page.click('[data-mode="TOUCH"]');
+    // Запускаем TOUCH режим (кликаем именно на стартовом экране)
+    await page.click('#start [data-mode="TOUCH"]');
     
     // Ждем загрузки
     await page.waitForTimeout(2000);
@@ -41,8 +42,8 @@ test.describe('Full Game Flow', () => {
     // Включаем логи
     await page.check('#logger-toggle');
     
-    // Запускаем игру
-    await page.click('[data-mode="TOUCH"]');
+    // Запускаем игру (кликаем на кнопку на стартовом экране)
+    await page.click('#start [data-mode="TOUCH"]');
     
     // Проверяем localStorage
     const showLogger = await page.evaluate(() => 
@@ -58,7 +59,7 @@ test.describe('Full Game Flow', () => {
     // Убеждаемся что статистика включена
     await page.check('#stats-toggle');
     
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(2000);
     
     // Панель должна быть видна
@@ -69,7 +70,7 @@ test.describe('Full Game Flow', () => {
     await page.goto('/');
     
     await page.check('#logger-toggle');
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(1000);
     
     // Логгер или кнопка должны быть видны
@@ -82,10 +83,10 @@ test.describe('Mode Switching', () => {
   test('Переключение с TOUCH на GYRO', async ({ page }) => {
     await page.goto('/');
     
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(1500);
     
-    // Переключаемся на GYRO
+    // Переключаемся на GYRO (теперь в mode-ui)
     await page.click('#mode-ui [data-mode="GYRO"]');
     
     // Страница должна перезагрузиться
@@ -95,7 +96,7 @@ test.describe('Mode Switching', () => {
   test('Режим сохраняется в localStorage', async ({ page }) => {
     await page.goto('/');
     
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(1000);
     
     const mode = await page.evaluate(() => 
@@ -111,7 +112,7 @@ test.describe('UI Interactions', () => {
     await page.goto('/');
     
     await page.check('#stats-toggle');
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(2000);
     
     // Кликаем на панель
@@ -125,7 +126,7 @@ test.describe('UI Interactions', () => {
   test('Logger toggle кнопка работает', async ({ page }) => {
     await page.goto('/');
     
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(1000);
     
     // Находим и кликаем кнопку логгера
@@ -157,7 +158,7 @@ test.describe('Performance', () => {
     });
     
     await page.goto('/');
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(3000);
     
     // Не должно быть критичных ошибок
@@ -170,12 +171,17 @@ test.describe('Performance', () => {
 });
 
 test.describe('Mobile specific', () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  // Используем viewport вместо devices
+  test.use({ 
+    viewport: { width: 393, height: 851 },
+    hasTouch: true,
+    isMobile: true
+  });
   
   test('Игра запускается на мобильном', async ({ page }) => {
     await page.goto('/');
     
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(2000);
     
     const canvas = page.locator('canvas');
@@ -185,7 +191,7 @@ test.describe('Mobile specific', () => {
   test('Touch управление работает', async ({ page }) => {
     await page.goto('/');
     
-    await page.click('[data-mode="TOUCH"]');
+    await page.click('#start [data-mode="TOUCH"]');
     await page.waitForTimeout(2000);
     
     const canvas = page.locator('canvas');
