@@ -1,6 +1,8 @@
 // ===================================
-// ФАЙЛ: src/cars/Car.js V24
+// ФАЙЛ: src/cars/Car.js V26
 // ИСПРАВЛЕНО:
+// - Исправлена проблема с distanceTo в тестах
+// - Добавлена защита от отсутствия метода distanceTo
 // - Исправлена проблема с немедленным деспавном после spawn
 // - Добавлена защита от выхода за пределы массива path
 // ===================================
@@ -254,7 +256,24 @@ export class Car {
   checkCollision(otherCar) {
     if (!this.isActive || !otherCar.isActive) return false;
     
-    const distance = this.model.position.distanceTo(otherCar.model.position);
+    // ✅ FIX: Проверяем наличие позиций и используем безопасное вычисление расстояния
+    const pos1 = this.model.position;
+    const pos2 = otherCar.model.position;
+    
+    if (!pos1 || !pos2) return false;
+    
+    // Используем метод distanceTo если доступен, иначе вычисляем вручную
+    let distance;
+    if (typeof pos1.distanceTo === 'function') {
+      distance = pos1.distanceTo(pos2);
+    } else {
+      // Ручное вычисление расстояния (работает и с моками)
+      const dx = pos1.x - pos2.x;
+      const dy = pos1.y - pos2.y;
+      const dz = pos1.z - pos2.z;
+      distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    
     const minDistance = 0.15;
     
     return distance < minDistance;

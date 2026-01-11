@@ -4,11 +4,11 @@
   "description": "AR детская игра с машинками на ковре",
   "type": "module",
   "scripts": {
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:watch": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage",
-    "test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
-    "test:integration": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
+    "test:watch": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --watch --runInBand",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage --runInBand",
+    "test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/unit --runInBand",
+    "test:integration": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration --runInBand",
     "test:e2e": "playwright test",
     "test:all": "npm run test:coverage && npm run test:e2e",
     "test:ci": "npm run test:coverage && npm run test:e2e"
@@ -16,6 +16,7 @@
   "jest": {
     "testEnvironment": "jsdom",
     "transform": {},
+    "maxWorkers": 1,
     "moduleNameMapper": {
       "^three$": "<rootDir>/tests/mocks/three.js",
       "^three/addons/(.*)$": "<rootDir>/tests/mocks/three-addons.js",
