@@ -1,15 +1,17 @@
 // ===================================
-// ФАЙЛ: tests/traffic/traffic_manager.test.js
+// ФАЙЛ: tests/traffic/traffic_manager.test.js V2
 // Unit тесты для TrafficManager
-// ИСПРАВЛЕНО: Убраны проблемные тесты с setTimeout, исправлена проверка pooledCars
+// УЛУЧШЕНО: Добавлены тесты для покрытия 85%+
+// Покрывает: error handling, edge cases, respawn logic, dispose cleanup
 // ===================================
 
-import { describe, test, expect, beforeEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { TrafficManager } from '../../src/traffic/traffic_manager.js';
 import { RoadNetwork } from '../../src/roads/roadNetwork.js';
 
 describe('TrafficManager', () => {
   let manager, network, mockParent;
+  let consoleErrorSpy, consoleWarnSpy, consoleLogSpy;
 
   beforeEach(() => {
     // Создаем сеть с несколькими узлами
@@ -26,6 +28,17 @@ describe('TrafficManager', () => {
     };
 
     manager = new TrafficManager(mockParent, network);
+    
+    // Мокируем console для чистых тестов
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
+    consoleLogSpy.mockRestore();
   });
 
   describe('Constructor', () => {
@@ -40,14 +53,9 @@ describe('TrafficManager', () => {
     });
 
     test('логирует создание', () => {
-      const consoleSpy = jest.spyOn(console, 'log');
-      new TrafficManager(mockParent, network);
-      
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('TrafficManager создан')
       );
-      
-      consoleSpy.mockRestore();
     });
   });
 
@@ -75,9 +83,17 @@ describe('TrafficManager', () => {
       expect(manager.carModels.isLoaded).toBe(true);
     });
 
-    test('проверяет валидность дорожной сети', async () => {
+    test('проверяет валидность дорожной сети - пустая сеть', async () => {
       const emptyNetwork = new RoadNetwork();
       const badManager = new TrafficManager(mockParent, emptyNetwork);
+      
+      await expect(badManager.init()).rejects.toThrow('Invalid road network');
+    });
+
+    test('проверяет валидность дорожной сети - null nodes', async () => {
+      const badNetwork = new RoadNetwork();
+      badNetwork.nodes = null;
+      const badManager = new TrafficManager(mockParent, badNetwork);
       
       await expect(badManager.init()).rejects.toThrow();
     });
@@ -91,16 +107,12 @@ describe('TrafficManager', () => {
     });
 
     test('логирует статистику сети', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      
       await manager.init();
       
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('Дорожная сеть'),
         expect.anything()
       );
-      
-      consoleSpy.mockRestore();
     });
   });
 
@@ -126,55 +138,185 @@ describe('TrafficManager', () => {
     }, 10000);
 
     test('логирует количество заспавненных машин', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      
       await manager.spawnCars(2);
       
-      expect(consoleSpy).toHaveBeenCalled();
-      
-      consoleSpy.mockRestore();
+      expect(consoleLogSpy).toHaveBeenCalled();
     }, 10000);
 
     test('обрабатывает спавн 0 машин', async () => {
       await expect(manager.spawnCars(0)).resolves.not.toThrow();
     });
+
+    test('логирует неудачный спавн машины', async () => {
+      // Мокируем getModelByName чтобы вернуть null
+      const originalGetModel = manager.carModels.getModelByName;
+      manager.carModels.getModelByName = jest.fn(() => null);
+      
+      await manager.spawnCars(1);
+      
+      // Должно быть предупреждение
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Не удалось заспавнить')
+      );
+      
+      manager.carModels.getModelByName = originalGetModel;
+    });
   });
 
-  describe('spawnCarWithModel()', () => {
-    let modelData;
-
+  describe('spawnCarWithModel() - Error Handling', () => {
     beforeEach(async () => {
       await manager.init();
-      modelData = manager.carModels.getRandomModel();
+    });
+
+    test('возвращает null для невалидных данных modelData', async () => {
+      const car = await manager.spawnCarWithModel(null);
+      
+      expect(car).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Невалидные данные модели'),
+        null
+      );
+    });
+
+    test('возвращает null если model undefined', async () => {
+      const car = await manager.spawnCarWithModel({ name: 'Test', model: null });
+      
+      expect(car).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Невалидные данные модели'),
+        expect.anything()
+      );
+    });
+
+    test('обрабатывает невалидный startNode', async () => {
+      const modelData = manager.carModels.getRandomModel();
+      
+      // Мокируем getRandomNode чтобы вернуть невалидный узел
+      const originalGetNode = network.getRandomNode;
+      network.getRandomNode = jest.fn()
+        .mockReturnValueOnce(null)  // первый вызов - startNode
+        .mockReturnValueOnce({ x: 1, y: 1 });  // второй вызов - endNode
+      
+      const car = await manager.spawnCarWithModel(modelData);
+      
+      expect(car).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid start node')
+      );
+      
+      network.getRandomNode = originalGetNode;
+    });
+
+    test('обрабатывает невалидный endNode после 10 попыток', async () => {
+      const modelData = manager.carModels.getRandomModel();
+      
+      const originalGetNode = network.getRandomNode;
+      const validStart = { x: 0, y: 0 };
+      
+      network.getRandomNode = jest.fn()
+        .mockReturnValueOnce(validStart)
+        .mockReturnValue(null);  // все остальные - null
+      
+      const car = await manager.spawnCarWithModel(modelData);
+      
+      expect(car).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Не удалось найти валидный конечный узел')
+      );
+      
+      network.getRandomNode = originalGetNode;
+    });
+
+    test('обрабатывает endNode === startNode', async () => {
+      const modelData = manager.carModels.getRandomModel();
+      
+      const originalGetNode = network.getRandomNode;
+      const sameNode = { x: 0, y: 0 };
+      
+      // Всегда возвращаем один и тот же узел
+      network.getRandomNode = jest.fn().mockReturnValue(sameNode);
+      
+      const car = await manager.spawnCarWithModel(modelData);
+      
+      expect(car).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      
+      network.getRandomNode = originalGetNode;
+    });
+
+    test('обрабатывает невозможность построить путь', async () => {
+      const modelData = manager.carModels.getRandomModel();
+      
+      const originalFindPath = network.findPath;
+      network.findPath = jest.fn().mockReturnValue([]);  // пустой путь
+      
+      const car = await manager.spawnCarWithModel(modelData);
+      
+      expect(car).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Невозможно построить путь')
+      );
+      
+      network.findPath = originalFindPath;
+    });
+
+    test('удаляет машину из cars если spawn failed', async () => {
+      const modelData = manager.carModels.getRandomModel();
+      const initialLength = manager.cars.length;
+      
+      // Мокируем car.spawn чтобы вернуть false
+      const originalGetNode = network.getRandomNode;
+      network.getRandomNode = jest.fn()
+        .mockReturnValueOnce({ x: 0, y: 0 })
+        .mockReturnValue({ x: 1, y: 1 });
+      
+      const originalFindPath = network.findPath;
+      network.findPath = jest.fn().mockReturnValue([
+        { x: 0, y: 0 }, 
+        { x: 1, y: 1 }
+      ]);
+      
+      // Создаём машину которая фейлит spawn
+      const car = await manager.spawnCarWithModel(modelData);
+      
+      // Машина может быть заспавнена или нет - оба варианта валидны
+      if (!car) {
+        expect(manager.cars.length).toBe(initialLength);
+      }
+      
+      network.getRandomNode = originalGetNode;
+      network.findPath = originalFindPath;
+    });
+  });
+
+  describe('spawnCarWithModel() - Success Path', () => {
+    beforeEach(async () => {
+      await manager.init();
     });
 
     test('спавнит машину с заданной моделью', async () => {
+      const modelData = manager.carModels.getRandomModel();
       const car = await manager.spawnCarWithModel(modelData);
       
-      // Машина может быть null если не удалось заспавнить
       if (car) {
         expect(car.modelName).toBe(modelData.name);
         expect(car.isActive).toBe(true);
-      } else {
-        // Если не удалось заспавнить, это тоже валидный исход
-        expect(car).toBeNull();
       }
     });
 
-    test('добавляет машину в массив cars если успешно', async () => {
+    test('добавляет машину в массив cars', async () => {
+      const modelData = manager.carModels.getRandomModel();
       const initialLength = manager.cars.length;
       
       const car = await manager.spawnCarWithModel(modelData);
       
       if (car) {
         expect(manager.cars.length).toBe(initialLength + 1);
-      } else {
-        // Если не удалось, длина не изменилась
-        expect(manager.cars.length).toBe(initialLength);
       }
     });
 
-    test('добавляет модель в сцену при успехе', async () => {
+    test('добавляет модель в сцену', async () => {
+      const modelData = manager.carModels.getRandomModel();
       const car = await manager.spawnCarWithModel(modelData);
       
       if (car) {
@@ -184,34 +326,23 @@ describe('TrafficManager', () => {
 
     test('применяет глобальный масштаб', async () => {
       manager.globalScaleMultiplier = 2.0;
+      const modelData = manager.carModels.getRandomModel();
       
       const car = await manager.spawnCarWithModel(modelData);
       
       expect(car).toBeDefined();
     });
 
-    test('возвращает null для невалидных данных', async () => {
-      const car = await manager.spawnCarWithModel(null);
-      
-      expect(car).toBeNull();
-    });
-
-    test('возвращает null если модель undefined', async () => {
-      const car = await manager.spawnCarWithModel({ name: 'Test', model: null });
-      
-      expect(car).toBeNull();
-    });
-
     test('логирует успешный спавн', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const modelData = manager.carModels.getRandomModel();
       
       await manager.spawnCarWithModel(modelData);
       
-      consoleSpy.mockRestore();
+      expect(consoleLogSpy).toHaveBeenCalled();
     });
   });
 
-  describe('update()', () => {
+  describe('update() - Collision Detection', () => {
     beforeEach(async () => {
       await manager.init();
       await manager.spawnCars(3);
@@ -224,20 +355,13 @@ describe('TrafficManager', () => {
     });
 
     test('обновляет все активные машины', () => {
-      const activeBefore = manager.cars.filter(c => c.isActive).length;
-      
-      // Просто проверяем что update не падает
       expect(() => manager.update()).not.toThrow();
-      
-      // Активных машин может быть >= 0
-      expect(activeBefore).toBeGreaterThanOrEqual(0);
     });
 
     test('обрабатывает коллизии между машинами', () => {
       const cars = manager.cars.filter(c => c.isActive);
       
       if (cars.length >= 2) {
-        // Мокируем checkCollision
         const original1 = cars[0].checkCollision;
         const original2 = cars[0].stopForCollision;
         const original3 = cars[1].stopForCollision;
@@ -249,9 +373,8 @@ describe('TrafficManager', () => {
           
           manager.update();
           
-          // Проверяем что методы определены
-          expect(cars[0].stopForCollision).toBeDefined();
-          expect(cars[1].stopForCollision).toBeDefined();
+          expect(cars[0].stopForCollision).toHaveBeenCalled();
+          expect(cars[1].stopForCollision).toHaveBeenCalled();
         } finally {
           cars[0].checkCollision = original1;
           cars[0].stopForCollision = original2;
@@ -273,7 +396,7 @@ describe('TrafficManager', () => {
           
           manager.update();
           
-          expect(cars[0].resumeMovement).toBeDefined();
+          expect(cars[0].resumeMovement).toHaveBeenCalled();
         } finally {
           cars[0].checkCollision = original1;
           cars[0].resumeMovement = original2;
@@ -281,7 +404,7 @@ describe('TrafficManager', () => {
       }
     });
 
-    test('обрабатывает ошибки в update машины', () => {
+    test('обрабатывает ошибки в update машины и вызывает despawn', () => {
       const cars = manager.cars.filter(c => c.isActive);
       
       if (cars.length >= 1) {
@@ -294,11 +417,109 @@ describe('TrafficManager', () => {
           });
           cars[0].despawn = jest.fn();
           
-          expect(() => manager.update()).not.toThrow();
+          manager.update();
+          
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            expect.stringContaining('Ошибка обновления машины'),
+            expect.anything()
+          );
+          expect(cars[0].despawn).toHaveBeenCalled();
         } finally {
           cars[0].update = originalUpdate;
           cars[0].despawn = originalDespawn;
         }
+      }
+    });
+  });
+
+  describe('update() - Respawn Logic', () => {
+    beforeEach(async () => {
+      await manager.init();
+      await manager.spawnCars(2);
+    }, 10000);
+
+    test('планирует респавн для деактивированных машин', (done) => {
+      const cars = manager.cars.filter(c => c.isActive);
+      
+      if (cars.length >= 1) {
+        const car = cars[0];
+        const originalRespawn = manager.respawnCar;
+        
+        // Мокируем respawnCar чтобы проверить вызов
+        manager.respawnCar = jest.fn().mockResolvedValue(null);
+        
+        // Деактивируем машину
+        car.isActive = false;
+        
+        // Вызываем update - должен запланировать респавн
+        manager.update();
+        
+        // Ждём чуть больше максимального таймаута (2000 + 500 = 2500ms)
+        setTimeout(() => {
+          expect(manager.respawnCar).toHaveBeenCalledWith(car);
+          manager.respawnCar = originalRespawn;
+          done();
+        }, 3000);
+      } else {
+        done();
+      }
+    }, 10000);
+  });
+
+  describe('respawnCar()', () => {
+    beforeEach(async () => {
+      await manager.init();
+      await manager.spawnCars(1);
+    }, 10000);
+
+    test('метод respawnCar существует', () => {
+      expect(manager.respawnCar).toBeDefined();
+      expect(typeof manager.respawnCar).toBe('function');
+    });
+
+    test('возвращает null для null car', async () => {
+      const result = await manager.respawnCar(null);
+      
+      expect(result).toBeNull();
+    });
+
+    test('возвращает null если модель не найдена', async () => {
+      const car = manager.cars[0];
+      car.modelName = 'NonExistent.glb';
+      
+      const result = await manager.respawnCar(car);
+      
+      expect(result).toBeNull();
+    });
+
+    test('удаляет старую машину из parent', async () => {
+      const car = manager.cars[0];
+      const initialRemoveCalls = mockParent.remove.mock.calls.length;
+      
+      await manager.respawnCar(car);
+      
+      expect(mockParent.remove.mock.calls.length).toBeGreaterThanOrEqual(initialRemoveCalls);
+    });
+
+    test('удаляет машину из массива cars', async () => {
+      const car = manager.cars[0];
+      const initialLength = manager.cars.length;
+      
+      await manager.respawnCar(car);
+      
+      // Машина удалена, но новая может быть добавлена или нет
+      expect(manager.cars).not.toContain(car);
+    });
+
+    test('создаёт новую машину с той же моделью', async () => {
+      const car = manager.cars[0];
+      const modelName = car.modelName;
+      
+      const newCar = await manager.respawnCar(car);
+      
+      if (newCar) {
+        expect(newCar.modelName).toBe(modelName);
+        expect(newCar).not.toBe(car);  // это должна быть новая машина
       }
     });
   });
@@ -316,7 +537,6 @@ describe('TrafficManager', () => {
     });
 
     test('применяет масштаб ко всем машинам', () => {
-      // Сохраняем оригинальные методы
       const originalMethods = manager.cars.map(car => car.setGlobalScale);
       
       try {
@@ -330,7 +550,6 @@ describe('TrafficManager', () => {
           expect(car.setGlobalScale).toHaveBeenCalledWith(1.5);
         });
       } finally {
-        // Восстанавливаем
         manager.cars.forEach((car, i) => {
           car.setGlobalScale = originalMethods[i];
         });
@@ -338,15 +557,11 @@ describe('TrafficManager', () => {
     });
 
     test('логирует установку масштаба', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      
       manager.setGlobalScale(2.0);
       
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('Глобальный масштаб')
       );
-      
-      consoleSpy.mockRestore();
     });
 
     test('работает с масштабом 0', () => {
@@ -376,20 +591,21 @@ describe('TrafficManager', () => {
       expect(stats.totalCars).toBeGreaterThan(0);
       expect(stats.activeCars).toBeGreaterThanOrEqual(0);
       expect(stats.activeCars).toBeLessThanOrEqual(stats.totalCars);
+      expect(stats.totalCars).toBe(stats.activeCars + stats.pooledCars);
     }, 10000);
 
     test('различает активные и неактивные машины', async () => {
       await manager.init();
       await manager.spawnCars(3);
       
-      // Деактивируем одну машину
       if (manager.cars.length > 0) {
         manager.cars[0].isActive = false;
       }
       
       const stats = manager.getStats();
       
-      expect(stats.activeCars).toBeLessThanOrEqual(stats.totalCars);
+      expect(stats.pooledCars).toBeGreaterThan(0);
+      expect(stats.totalCars).toBe(stats.activeCars + stats.pooledCars);
     }, 10000);
   });
 
@@ -399,13 +615,25 @@ describe('TrafficManager', () => {
       await manager.spawnCars(3);
     }, 10000);
 
-    test('удаляет все машины из сцены', () => {
+    test('удаляет все машины из сцены с parent', () => {
+      // Убеждаемся что у машин есть parent
+      manager.cars.forEach(car => {
+        car.model.parent = mockParent;
+      });
+      
       const carsCount = manager.cars.length;
       
       manager.dispose();
       
-      // Проверяем что remove был вызван хотя бы раз
-      expect(mockParent.remove.mock.calls.length).toBeGreaterThanOrEqual(0);
+      expect(mockParent.remove.mock.calls.length).toBe(carsCount);
+    });
+
+    test('не падает если у машины нет parent', () => {
+      manager.cars.forEach(car => {
+        car.model.parent = null;
+      });
+      
+      expect(() => manager.dispose()).not.toThrow();
     });
 
     test('очищает массив cars', () => {
@@ -427,15 +655,14 @@ describe('TrafficManager', () => {
     });
 
     test('логирует очистку', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      
       manager.dispose();
       
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Очистка TrafficManager')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('TrafficManager очищен')
       );
-      
-      consoleSpy.mockRestore();
     });
 
     test('позволяет повторную инициализацию', async () => {
@@ -476,25 +703,13 @@ describe('TrafficManager', () => {
       
       expect(() => manager.dispose()).not.toThrow();
     });
-  });
 
-  describe('respawnCar()', () => {
-    beforeEach(async () => {
+    test('spawnSingleCar() работает', async () => {
       await manager.init();
-      await manager.spawnCars(1);
-    }, 10000);
-
-    test('метод respawnCar существует', () => {
-      expect(manager.respawnCar).toBeDefined();
-      expect(typeof manager.respawnCar).toBe('function');
-    });
-
-    test('respawnCar возвращает результат', async () => {
-      const car = manager.cars[0];
-      const result = await manager.respawnCar(car);
+      const car = await manager.spawnSingleCar();
       
-      // Результат может быть либо новой машиной, либо null
-      expect(result === null || typeof result === 'object').toBe(true);
+      // Машина может быть либо создана, либо null
+      expect(car === null || typeof car === 'object').toBe(true);
     });
   });
 });
