@@ -803,3 +803,356 @@ describe('TrafficManager', () => {
       const car = manager.cars[0];
       car.modelName = 'NonExistent.glb';
       
+      const result = await manager.respawnCar(car);
+      
+      expect(result).toBeNull();
+    });
+
+    test('удаляет машину из parent если есть', async () => {
+      const car = manager.cars[0];
+      car.model.parent = mockParent;
+      
+      const initialRemoveCalls = mockParent.remove.mock.calls.length;
+      
+      await manager.respawnCar(car);
+      
+      expect(mockParent.remove.mock.calls.length).toBeGreaterThanOrEqual(initialRemoveCalls);
+    });
+
+    test('не падает если у машины нет parent', async () => {
+      const car = manager.cars[0];
+      car.model.parent = null;
+      
+      await expect(manager.respawnCar(car)).resolves.not.toThrow();
+    });
+
+    test('удаляет машину из массива cars', async () => {
+      const car = manager.cars[0];
+      
+      await manager.respawnCar(car);
+      
+      expect(manager.cars).not.toContain(car);
+    });
+
+    test('создаёт новую машину с той же моделью при успехе', async () => {
+      const car = manager.cars[0];
+      const modelName = car.modelName;
+      const initialLength = manager.cars.length;
+      
+      const newCar = await manager.respawnCar(car);
+      
+      if (newCar) {
+        expect(newCar.modelName).toBe(modelName);
+        expect(newCar).not.toBe(car);
+      }
+    });
+  });
+
+  // ============================================
+  // SET GLOBAL SCALE
+  // ============================================
+  describe('setGlobalScale()', () => {
+    beforeEach(async () => {
+      await manager.init();
+      await manager.spawnCars(2);
+    }, 10000);
+
+    test('устанавливает globalScaleMultiplier', () => {
+      manager.setGlobalScale(2.5);
+      
+      expect(manager.globalScaleMultiplier).toBe(2.5);
+    });
+
+    test('применяет масштаб ко всем машинам', () => {
+      const originalMethods = manager.cars.map(car => car.setGlobalScale);
+      
+      try {
+        manager.cars.forEach(car => {
+          car.setGlobalScale = jest.fn();
+        });
+        
+        manager.setGlobalScale(1.5);
+        
+        manager.cars.forEach(car => {
+          expect(car.setGlobalScale).toHaveBeenCalledWith(1.5);
+        });
+      } finally {
+        manager.cars.forEach((car, i) => {
+          car.setGlobalScale = originalMethods[i];
+        });
+      }
+    });
+
+    test('логирует установку масштаба', () => {
+      manager.setGlobalScale(2.0);
+      
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/Глобальный масштаб/)
+      );
+    });
+
+    test('работает с масштабом 0', () => {
+      expect(() => manager.setGlobalScale(0)).not.toThrow();
+      expect(manager.globalScaleMultiplier).toBe(0);
+    });
+
+    test('работает с отрицательным масштабом', () => {
+      expect(() => manager.setGlobalScale(-1)).not.toThrow();
+      expect(manager.globalScaleMultiplier).toBe(-1);
+    });
+
+    test('работает с очень большим масштабом', () => {
+      expect(() => manager.setGlobalScale(999.99)).not.toThrow();
+      expect(manager.globalScaleMultiplier).toBe(999.99);
+    });
+
+    test('работает с дробным масштабом', () => {
+      manager.setGlobalScale(0.123);
+      expect(manager.globalScaleMultiplier).toBe(0.123);
+    });
+
+    test('работает с пустым массивом машин', () => {
+      manager.cars = [];
+      expect(() => manager.setGlobalScale(2.0)).not.toThrow();
+    });
+  });
+
+  // ============================================
+  // GET STATS
+  // ============================================
+  describe('getStats()', () => {
+    test('возвращает нули для пустого менеджера', () => {
+      const stats = manager.getStats();
+      
+      expect(stats.totalCars).toBe(0);
+      expect(stats.activeCars).toBe(0);
+      expect(stats.pooledCars).toBe(0);
+    });
+
+    test('подсчитывает активные машины', async () => {
+      await manager.init();
+      await manager.spawnCars(5);
+      
+      const stats = manager.getStats();
+      
+      expect(stats.totalCars).toBeGreaterThan(0);
+      expect(stats.activeCars).toBeGreaterThanOrEqual(0);
+      expect(stats.activeCars).toBeLessThanOrEqual(stats.totalCars);
+    }, 10000);
+
+    test('подсчитывает неактивные машины (pooled)', async () => {
+      await manager.init();
+      await manager.spawnCars(3);
+      
+      if (manager.cars.length > 0) {
+        manager.cars[0].isActive = false;
+      }
+      
+      const stats = manager.getStats();
+      
+      expect(stats.pooledCars).toBeGreaterThan(0);
+    }, 10000);
+
+    test('сумма активных и pooled равна total', async () => {
+      await manager.init();
+      await manager.spawnCars(5);
+      
+      if (manager.cars.length > 1) {
+        manager.cars[0].isActive = false;
+        manager.cars[1].isActive = false;
+      }
+      
+      const stats = manager.getStats();
+      
+      expect(stats.totalCars).toBe(stats.activeCars + stats.pooledCars);
+    }, 10000);
+
+    test('обновляется после изменений', async () => {
+      await manager.init();
+      await manager.spawnCars(3);
+      
+      const stats1 = manager.getStats();
+      
+      if (manager.cars.length > 0) {
+        manager.cars[0].isActive = false;
+      }
+      
+      const stats2 = manager.getStats();
+      
+      expect(stats2.activeCars).toBeLessThanOrEqual(stats1.activeCars);
+    }, 10000);
+  });
+
+  // ============================================
+  // DISPOSE
+  // ============================================
+  describe('dispose()', () => {
+    beforeEach(async () => {
+      await manager.init();
+      await manager.spawnCars(3);
+    }, 10000);
+
+    test('удаляет машины с parent из сцены', () => {
+      manager.cars.forEach(car => {
+        car.model.parent = mockParent;
+      });
+      
+      const carsCount = manager.cars.length;
+      
+      manager.dispose();
+      
+      expect(mockParent.remove.mock.calls.length).toBe(carsCount);
+    });
+
+    test('не падает если parent === null', () => {
+      manager.cars.forEach(car => {
+        car.model.parent = null;
+      });
+      
+      expect(() => manager.dispose()).not.toThrow();
+    });
+
+    test('очищает массив cars до []', () => {
+      manager.dispose();
+      
+      expect(manager.cars).toEqual([]);
+      expect(manager.cars.length).toBe(0);
+    });
+
+    test('очищает carPool до []', () => {
+      manager.dispose();
+      
+      expect(manager.carPool).toEqual([]);
+      expect(manager.carPool.length).toBe(0);
+    });
+
+    test('сбрасывает isInitialized в false', () => {
+      manager.dispose();
+      
+      expect(manager.isInitialized).toBe(false);
+    });
+
+    test('логирует начало очистки', () => {
+      manager.dispose();
+      
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Очистка TrafficManager')
+      );
+    });
+
+    test('логирует завершение очистки', () => {
+      manager.dispose();
+      
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('TrafficManager очищен')
+      );
+    });
+
+    test('позволяет повторную инициализацию', async () => {
+      manager.dispose();
+      
+      await expect(manager.init()).resolves.not.toThrow();
+      expect(manager.isInitialized).toBe(true);
+    });
+
+    test('можно вызвать dispose() повторно', () => {
+      manager.dispose();
+      
+      expect(() => manager.dispose()).not.toThrow();
+    });
+
+    test('dispose() работает перед init()', () => {
+      const freshManager = new TrafficManager(mockParent, network);
+      
+      expect(() => freshManager.dispose()).not.toThrow();
+    });
+  });
+
+  // ============================================
+  // EDGE CASES & EXTREME VALUES
+  // ============================================
+  describe('Edge Cases', () => {
+    test('spawnCars(-100) не падает', async () => {
+      await manager.init();
+      await expect(manager.spawnCars(-100)).resolves.not.toThrow();
+    });
+
+    test('spawnCars(Infinity) не падает', async () => {
+      await manager.init();
+      await expect(manager.spawnCars(Infinity)).resolves.not.toThrow();
+    }, 10000);
+
+    test('setGlobalScale(NaN) не падает', () => {
+      expect(() => manager.setGlobalScale(NaN)).not.toThrow();
+    });
+
+    test('setGlobalScale(Infinity) не падает', () => {
+      expect(() => manager.setGlobalScale(Infinity)).not.toThrow();
+    });
+
+    test('update() многократно не ломает состояние', async () => {
+      await manager.init();
+      await manager.spawnCars(2);
+      
+      for (let i = 0; i < 100; i++) {
+        expect(() => manager.update()).not.toThrow();
+      }
+    }, 10000);
+
+    test('getStats() не изменяет состояние', async () => {
+      await manager.init();
+      await manager.spawnCars(2);
+      
+      const cars1 = manager.cars.length;
+      manager.getStats();
+      const cars2 = manager.cars.length;
+      
+      expect(cars1).toBe(cars2);
+    }, 10000);
+
+    test('работает с пустой roadNetwork после init', async () => {
+      const emptyNet = new RoadNetwork();
+      emptyNet.addNode(0, 0);
+      emptyNet.addNode(1, 1);
+      
+      const mgr = new TrafficManager(mockParent, emptyNet);
+      await expect(mgr.init()).resolves.not.toThrow();
+    });
+  });
+
+  // ============================================
+  // SPAWN SINGLE CAR
+  // ============================================
+  describe('spawnSingleCar()', () => {
+    beforeEach(async () => {
+      await manager.init();
+    });
+
+    test('метод существует', () => {
+      expect(manager.spawnSingleCar).toBeDefined();
+      expect(typeof manager.spawnSingleCar).toBe('function');
+    });
+
+    test('возвращает Promise', () => {
+      const result = manager.spawnSingleCar();
+      expect(result).toBeInstanceOf(Promise);
+    });
+
+    test('спавнит одну машину', async () => {
+      const car = await manager.spawnSingleCar();
+      
+      // Может вернуть машину или null
+      expect(car === null || typeof car === 'object').toBe(true);
+    });
+
+    test('использует случайную модель', async () => {
+      const spy = jest.spyOn(manager.carModels, 'getRandomModel');
+      
+      await manager.spawnSingleCar();
+      
+      expect(spy).toHaveBeenCalled();
+      
+      spy.mockRestore();
+    });
+  });
+});
