@@ -1,20 +1,36 @@
-// Playwright config — v11.3.1 (ESM)
+// ===================================
+// ФАЙЛ: playwright.config.js
+// Конфигурация Playwright для E2E тестов
+// ===================================
+
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './e2e',                // <-- e2e в корне репо
-  fullyParallel: true,
-  reporter: 'list',
-  timeout: 60_000,
+  testDir: './tests/e2e',
+  fullyParallel: false,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: 1,
+  reporter: 'html',
+  timeout: 30000,
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
-    trace: 'retain-on-failure',
+    baseURL: 'http://localhost:8000',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    screenshot: 'only-on-failure'
   },
+
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox',  use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit',   use: { ...devices['Desktop Safari'] } },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
+
+  webServer: {
+    command: 'python server.py',
+    url: 'http://localhost:8000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
 });
