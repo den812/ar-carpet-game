@@ -1,9 +1,9 @@
 // ===================================
-// ФАЙЛ: src/nonAr.js V31
-// ДОБАВЛЕНО:
-// - Bump mapping для текстуры ковра (яркие цвета)
-// - Normal map для объёма дорог
-// - Улучшенное освещение
+// ФАЙЛ: src/nonAr.js V23
+// ИСПРАВЛЕНО:
+// - Добавлена обработка ошибок
+// - Защита от черного экрана
+// - Try-catch блоки
 // ===================================
 
 import * as THREE from "three";
@@ -40,82 +40,39 @@ export function startNonAR(mode, settings = {}) {
     }
     updateCam();
 
-    // ✅ Renderer с улучшенными настройками
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true,
-      powerPreference: "high-performance"
-    });
+    // ✅ Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(innerWidth, innerHeight);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); // Оптимизация
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setPixelRatio(devicePixelRatio);
     document.body.appendChild(renderer.domElement);
     renderer.domElement.style.cursor = 'grab';
 
-    // ✅ УЛУЧШЕННОЕ ОСВЕЩЕНИЕ для bump mapping
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    
-    const dl = new THREE.DirectionalLight(0xffffff, 1.0);
+    // ✅ Освещение
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dl = new THREE.DirectionalLight(0xffffff, 1.2);
     dl.position.set(5, 10, 5);
-    dl.castShadow = true;
-    dl.shadow.mapSize.width = 2048;
-    dl.shadow.mapSize.height = 2048;
     scene.add(dl);
-    
-    // Дополнительный свет для объема
-    const dl2 = new THREE.DirectionalLight(0xffeedd, 0.3);
-    dl2.position.set(-5, 5, -5);
-    scene.add(dl2);
 
-    // ✅ ЗАГРУЗКА ТЕКСТУРЫ КОВРА С BUMP MAPPING
-    const textureLoader = new THREE.TextureLoader();
-    
-    textureLoader.load(
+    // ✅ Загрузка текстуры ковра
+    new THREE.TextureLoader().load(
       './assets/carpet-scan.jpg',
-      texture => {
+      tex => {
         console.log('✅ Текстура ковра загружена');
-        
-        // Настройки текстуры для яркости
-        texture.encoding = THREE.sRGBEncoding;
-        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        
-        // 🎨 BUMP MAPPING: используем ту же текстуру как bump map
-        const bumpMap = texture.clone();
-        bumpMap.needsUpdate = true;
-        
         const carpet = new THREE.Mesh(
           new THREE.PlaneGeometry(2.0, 2.5),
-          new THREE.MeshStandardMaterial({ 
-            map: texture,
-            bumpMap: bumpMap,           // ✅ BUMP MAP для рельефа
-            bumpScale: 0.005,            // Небольшой рельеф
-            roughness: 0.8,              // Текстура ткани
-            metalness: 0.0,              // Не металл
-            side: THREE.DoubleSide,
-            // Увеличиваем яркость цветов
-            emissive: 0x222222,          // Немного свечения
-            emissiveIntensity: 0.1
-          })
+          new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide })
         );
         carpet.rotation.x = -Math.PI / 2;
-        carpet.receiveShadow = true;
         scene.add(carpet);
-        
-        console.log('🎨 Bump mapping применен к ковру');
       },
       undefined,
       err => {
         console.warn('⚠️ Ошибка загрузки текстуры, используем серый цвет');
         const carpet = new THREE.Mesh(
           new THREE.PlaneGeometry(2.0, 2.5),
-          new THREE.MeshStandardMaterial({ 
-            color: 0x888888, 
-            side: THREE.DoubleSide,
-            roughness: 0.8
-          })
+          new THREE.MeshStandardMaterial({ color: 0x888888, side: THREE.DoubleSide })
         );
         carpet.rotation.x = -Math.PI / 2;
-        carpet.receiveShadow = true;
         scene.add(carpet);
       }
     );
@@ -324,7 +281,7 @@ export function startNonAR(mode, settings = {}) {
         // Обновляем машины
         trafficManager.update();
         
-        // Обновляем статистику
+        // ✅ ИСПРАВЛЕНО: Обновляем статистику с проверкой
         if (statsPanel && statsPanel.isVisible) {
           const stats = trafficManager.getStats();
           statsPanel.update({
