@@ -14,16 +14,6 @@ export function createRoadNetwork(parent, options = {}) {
   
   try {
     const network = new RoadNetwork();
-
-    // ✅ Включаем новую топологию 27 узлов/50+ дорог/100+ полос по умолчанию (можно выключить через options.useTopology27=false)
-    const useTopology27 = options.useTopology27 !== false;
-    if (useTopology27) {
-      createTopology27(network);
-      if (options.showRoads) { console.log('🛣️ Topology27 nodes:', network.nodes.length, 'roads:', network.roads.length, 'lanes:', network.lanes.length); }
-      return network;
-    }
-
-
     
     const showRoads = options.showRoads || false;
     const roadWidth = 0.08;
@@ -300,50 +290,5 @@ export function createRoadNetwork(parent, options = {}) {
     console.error('❌ КРИТИЧЕСКАЯ ОШИБКА создания дорожной сети:', err);
     console.error('Stack trace:', err.stack);
     throw err;
-  }
-}
-
-// ===================== Topology 27 =====================
-function createTopology27(network) {
-  // 27 узлов: 3 ряда × 9 колонок, координаты в диапазоне [-0.9..0.9] × [-0.8, 0.0, 0.8]
-  const xs = [-0.9,-0.7,-0.5,-0.3,-0.1,0.1,0.3,0.5,0.7];
-  const ys = [-0.8, 0.0, 0.8];
-  const grid = [];
-  for (let r=0; r<ys.length; r++) {
-    const row=[]; grid.push(row);
-    for (let c=0; c<xs.length; c++) {
-      row.push(network.addNode(xs[c], ys[r]));
-    }
-  }
-
-  // Горизонтальные дороги (по рядам)
-  for (let r=0; r<ys.length; r++) {
-    for (let c=0; c<xs.length-1; c++) {
-      network.addRoad(grid[r][c], grid[r][c+1]);
-    }
-  }
-  // Вертикальные дороги (между рядами)
-  for (let c=0; c<xs.length; c++) {
-    network.addRoad(grid[0][c], grid[1][c]);
-    network.addRoad(grid[1][c], grid[2][c]);
-  }
-  // Диагонали для увеличения связности и имитации плавных съездов/круговых
-  for (let c=0; c<xs.length-1; c+=2) {
-    network.addRoad(grid[0][c], grid[1][c+1]);
-    network.addRoad(grid[1][c], grid[2][c+1]);
-  }
-  for (let c=1; c<xs.length-1; c+=2) {
-    network.addRoad(grid[0][c+1], grid[1][c]);
-    network.addRoad(grid[1][c+1], grid[2][c]);
-  }
-  // Угловые циклы (условные круговые развязки) — треугольные циклы в углах
-  const corners = [ [0,0], [0,8], [2,0], [2,8] ];
-  for (const [r,c] of corners) {
-    const a = grid[r][c];
-    const b = grid[r][Math.max(0, Math.min(8, c + (c===0?1:-1)))];
-    const d = grid[Math.max(0, Math.min(2, r + (r===0?1:-1)))][c];
-    network.addRoad(a,b);
-    network.addRoad(b,d);
-    network.addRoad(d,a);
   }
 }
